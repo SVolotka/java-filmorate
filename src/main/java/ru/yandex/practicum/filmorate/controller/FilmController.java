@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,7 +34,7 @@ public class FilmController {
     }
 
     @PostMapping
-    public Film create(@RequestBody Film film) {
+    public Film create(@RequestBody @Valid Film film) {
         log.info("Получен HTTP-запрос на создание фильма: {}", film);
 
         validateReleaseDate(film.getReleaseDate());
@@ -46,7 +47,7 @@ public class FilmController {
     }
 
     @PutMapping
-    public Film update(@RequestBody Film newFilm) {
+    public Film update(@RequestBody @Valid Film newFilm) {
         log.info("Получен HTTP-запрос на обновление фильма: {}", newFilm);
 
         Long id = newFilm.getId();
