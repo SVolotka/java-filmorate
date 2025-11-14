@@ -1,12 +1,22 @@
 package ru.yandex.practicum.filmorate.model;
 
-import lombok.Getter;
-import lombok.Setter;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-/**
- * Film.
- */
-@Getter
-@Setter
+import java.time.LocalDate;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class Film {
+    private Long id;
+    @NotBlank(message = "Название фильма не может быть null или пустым")
+    private String name;
+    @Size(max = 200, message = "Длина описания не должна превышать 200 символов")
+    private String description;
+    private LocalDate releaseDate;
+    private long duration;
 }
