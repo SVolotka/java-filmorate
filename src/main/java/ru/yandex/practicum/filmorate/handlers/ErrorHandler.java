@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.handlers;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -76,5 +77,21 @@ public class ErrorHandler {
         log.error(exception.getMessage());
         return ErrorResponse.builder()
                 .errorCode(HttpStatus.BAD_REQUEST.value()).description(exception.getMessage()).build();
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMethodArgumentNotValidException(MethodArgumentNotValidException exception) {
+        String errorMessage = exception.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .orElse("Validation error");
+
+        log.error((errorMessage));
+
+        return ErrorResponse.builder()
+                .errorCode(HttpStatus.BAD_REQUEST.value())
+                .description(errorMessage)
+                .build();
     }
 }

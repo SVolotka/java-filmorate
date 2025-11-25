@@ -36,16 +36,16 @@ public class FilmController {
     @PostMapping
     public Film create(@RequestBody @Valid Film film) {
         log.info("Получен HTTP-запрос на создание фильма: {}", film);
-        filmService.create(film);
-        log.info("Успешно обработан HTTP-запрос на создание фильма: {}", film);
-        return film;
+        Film createdFilm = filmService.create(film);
+        log.info("Успешно обработан HTTP-запрос на создание фильма: {}", createdFilm);
+        return createdFilm;
     }
 
     @PutMapping
     public Film update(@RequestBody @Valid Film film) {
         log.info("Получен HTTP-запрос на обновление фильма: {}", film);
         Film updatedFilm = filmService.update(film);
-        log.info("Успешно обработан HTTP-запрос на обновление фильма: {}", film);
+        log.info("Успешно обработан HTTP-запрос на обновление фильма: {}", updatedFilm);
         return updatedFilm;
     }
 
