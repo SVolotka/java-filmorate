@@ -11,7 +11,10 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Data
 @AllArgsConstructor
@@ -27,17 +30,36 @@ public class Film {
     @Positive(message = "Продолжительность фильма должна быть положительной")
     private long duration;
 
+    @NotNull(message = "Рейтинг MPA обязателен")
+    private Mpa mpa;
+
+    private LinkedHashSet<Genre> genres = new LinkedHashSet<>();
+
     @JsonIgnore
    private Set<Long> userIds = new HashSet<>();
 
     @JsonIgnore
     private Long rate = 0L;
 
-    public Film(Long id, String name, String description, LocalDate releaseDate, long duration) {
-        this.id = id;
-        this.name = name;
-        this.description = description;
-        this.releaseDate = releaseDate;
-        this.duration = duration;
+    public void setGenres(Set<Genre> genres) {
+        if (genres != null) {
+            this.genres = genres.stream()
+                    .filter(g -> g != null && g.getId() != null)
+                    .map(g -> new Genre(g.getId(), null))
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+        } else {
+            this.genres = new LinkedHashSet<>();
+        }
+    }
+
+    public Integer getMpaId() {
+        return mpa != null ? mpa.getId() : null;
+    }
+
+    public Set<Integer> getGenreIds() {
+        return genres.stream()
+                .map(Genre::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 }

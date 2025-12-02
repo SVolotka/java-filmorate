@@ -2,102 +2,88 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.dal.FilmRepository;
+import ru.yandex.practicum.filmorate.dal.GenreRepository;
 import ru.yandex.practicum.filmorate.exception.InvalidDurationException;
 import ru.yandex.practicum.filmorate.exception.InvalidReleaseDateException;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
-import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class FilmService {
     private static final LocalDate FILM_BIRTHDAY = LocalDate.of(1895, 12, 28);
-    private static final int Max_Name_Size = 200;
-    public static final Comparator<Film> FILM_COMPARATOR = Comparator.comparingLong(Film::getRate).reversed();
-    private long counter = 0L;
 
-    private final FilmStorage filmStorage;
-    private final UserStorage userStorage;
+    private final FilmRepository filmRepository;
+    private final GenreRepository genreRepository;
 
     public Film create(Film film) {
         validate(film);
-        film.setId(++counter);
-        if (film.getUserIds() == null) {
-            film.setUserIds(new HashSet<>());
-        }
-        filmStorage.create(film);
-        return film;
+        validateGenres(film.getGenreIds());
+        Film saved = filmRepository.create(film);
+        return filmRepository.get(saved.getId());
     }
 
     public Film get(long id) {
-        return filmStorage.get(id);
+        return filmRepository.get(id);
     }
 
     public List<Film> findAll() {
-        return new ArrayList<>(filmStorage.getAll());
+        return filmRepository.findAll();
     }
 
     public Film update(Film film) {
-        Film existingFilm = filmStorage.get(film.getId());
         validate(film);
-
-        if (film.getUserIds() == null) {
-            film.setUserIds(existingFilm.getUserIds());
+        if (!filmRepository.exists(film.getId())) {
+            throw new NotFoundException("Film with id=" + film.getId() + " not found");
         }
-        if (film.getRate() == null) {
-            film.setRate(existingFilm.getRate());
-        }
-
-        filmStorage.update(film);
-        return film;
+        validateGenres(film.getGenreIds());
+        Film updated = filmRepository.update(film);
+        filmRepository.updateGenres(updated.getId(), film.getGenreIds());
+        return filmRepository.get(updated.getId());
     }
 
     public void addLike(long filmId, long userId) {
-        final Film film = filmStorage.get(filmId);
-        userStorage.get(userId);
-        if (film.getUserIds() == null) {
-            film.setUserIds(new HashSet<>());
-        }
-        film.getUserIds().add(userId);
-        film.setRate((long) film.getUserIds().size());
+        filmRepository.addLike(filmId, userId);
     }
 
     public void removeLike(long filmId, long userId) {
-        final Film film = filmStorage.get(filmId);
-        userStorage.get(userId);
-        if (film.getUserIds() != null) {
-            film.getUserIds().remove(userId);
-            film.setRate((long) film.getUserIds().size());
-        }
+        filmRepository.removeLike(filmId, userId);
     }
 
     public List<Film> getPopular(int count) {
-        return filmStorage.getAll().stream()
-                .sorted(FILM_COMPARATOR)
-                .limit(count)
-                .collect(Collectors.toList());
+        return filmRepository.getPopularFilms(count);
     }
 
     private void validate(Film film) {
-        if (film.getName() == null || film.getName().isEmpty()) {
-            throw new ValidationException("File name invalid");
+        if (film.getName() == null || film.getName().isBlank()) {
+            throw new ValidationException("Название фильма не может быть пустым");
         }
-        if (film.getDescription() != null && film.getDescription().length() > Max_Name_Size) {
-            throw new ValidationException("Film description invalid");
+        if (film.getDescription() != null && film.getDescription().length() > 200) {
+            throw new ValidationException("Описание не должно превышать 200 символов");
         }
         if (film.getReleaseDate() == null || film.getReleaseDate().isBefore(FILM_BIRTHDAY)) {
-            throw new InvalidReleaseDateException("Film release date invalid");
+            throw new InvalidReleaseDateException("Дата релиза не может быть раньше 28.12.1895");
         }
         if (film.getDuration() <= 0) {
-            throw new InvalidDurationException("Film duration invalid");
+            throw new InvalidDurationException("Продолжительность должна быть положительной");
+        }
+        if (film.getMpa() == null || film.getMpa().getId() == null) {
+            throw new ValidationException("Рейтинг MPA обязателен");
+        }
+    }
+
+    private void validateGenres(java.util.Set<Integer> genreIds) {
+        if (genreIds == null) return;
+        List<Integer> invalid = genreIds.stream()
+                .filter(id -> genreRepository.findById(id).isEmpty())
+                .toList();
+        if (!invalid.isEmpty()) {
+            throw new ValidationException("Неизвестные жанры: " + invalid);
         }
     }
 }
