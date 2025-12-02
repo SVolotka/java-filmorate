@@ -4,14 +4,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.dal.FilmRepository;
 import ru.yandex.practicum.filmorate.dal.GenreRepository;
+import ru.yandex.practicum.filmorate.exception.FilmNotFoundException;
 import ru.yandex.practicum.filmorate.exception.InvalidDurationException;
 import ru.yandex.practicum.filmorate.exception.InvalidReleaseDateException;
-import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +30,9 @@ public class FilmService {
     }
 
     public Film get(long id) {
+        if (!filmRepository.exists(id)) {
+            throw new FilmNotFoundException("Film with id=" + id + " not found");
+        }
         return filmRepository.get(id);
     }
 
@@ -39,7 +43,7 @@ public class FilmService {
     public Film update(Film film) {
         validate(film);
         if (!filmRepository.exists(film.getId())) {
-            throw new NotFoundException("Film with id=" + film.getId() + " not found");
+            throw new FilmNotFoundException("Film with id=" + film.getId() + " not found");
         }
         validateGenres(film.getGenreIds());
         Film updated = filmRepository.update(film);
@@ -48,10 +52,16 @@ public class FilmService {
     }
 
     public void addLike(long filmId, long userId) {
+        if (!filmRepository.exists(filmId)) {
+            throw new FilmNotFoundException("Film with id=" + filmId + " not found");
+        }
         filmRepository.addLike(filmId, userId);
     }
 
     public void removeLike(long filmId, long userId) {
+        if (!filmRepository.exists(filmId)) {
+            throw new FilmNotFoundException("Film with id=" + filmId + " not found");
+        }
         filmRepository.removeLike(filmId, userId);
     }
 
@@ -77,7 +87,7 @@ public class FilmService {
         }
     }
 
-    private void validateGenres(java.util.Set<Integer> genreIds) {
+    private void validateGenres(Set<Integer> genreIds) {
         if (genreIds == null) return;
         List<Integer> invalid = genreIds.stream()
                 .filter(id -> genreRepository.findById(id).isEmpty())
