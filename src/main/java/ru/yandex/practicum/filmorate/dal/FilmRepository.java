@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.dal;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Repository;
@@ -7,8 +8,8 @@ import ru.yandex.practicum.filmorate.dal.mappers.FilmRowMapper;
 import ru.yandex.practicum.filmorate.dal.mappers.GenreRowMapper;
 import ru.yandex.practicum.filmorate.exception.InternalServerException;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
-import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 
 import java.sql.PreparedStatement;
@@ -24,6 +25,7 @@ import java.util.Objects;
 import java.util.Set;
 
 @Repository
+@Slf4j
 public class FilmRepository {
 
     private static final String FIND_ALL_QUERY = """
@@ -54,7 +56,7 @@ public class FilmRepository {
             """;
 
     private static final String INSERT_QUERY =
-            "INSERT INTO films (name, description, releaseDate, duration, mpa_id)VALUES (?, ?, ?, ?, ?)";
+            "INSERT INTO films (name, description, releaseDate, duration, mpa_id) VALUES (?, ?, ?, ?, ?)";
 
     private static final String UPDATE_QUERY = """
                 UPDATE films
@@ -62,8 +64,15 @@ public class FilmRepository {
                 WHERE film_id = ?
             """;
 
-    private static final String ADD_LIKE_QUERY = "INSERT INTO likes (user_id, film_id) VALUES (?, ?)";
+    private static final String ADD_LIKE_QUERY = """
+            INSERT INTO likes (user_id, film_id)
+            SELECT ?, ? WHERE NOT EXISTS (
+                SELECT 1 FROM likes WHERE user_id = ? AND film_id = ?
+            )
+            """;
+
     private static final String REMOVE_LIKE_QUERY = "DELETE FROM likes WHERE user_id = ? AND film_id = ?";
+
     private static final String GET_LIKES_COUNT_QUERY = "SELECT COUNT(*) FROM likes WHERE film_id = ?";
     private static final String GET_LIKED_USERS_QUERY = "SELECT user_id FROM likes WHERE film_id = ?";
 
@@ -95,7 +104,6 @@ public class FilmRepository {
     """;
 
     private static final String DELETE_GENRES_BY_FILM_ID = "DELETE FROM film_genre WHERE film_id = ?";
-
     private static final String INSERT_FILM_GENRE = "INSERT INTO film_genre (film_id, genre_id) VALUES (?, ?)";
 
     private final JdbcTemplate jdbcTemplate;
@@ -115,7 +123,6 @@ public class FilmRepository {
         this.mpaRepository = mpaRepository;
         this.genreRepository = genreRepository;
     }
-
 
     public List<Film> findAll() {
         List<Film> films = jdbcTemplate.query(FIND_ALL_QUERY, filmRowMapper);
@@ -150,9 +157,6 @@ public class FilmRepository {
             ps.setString(2, film.getDescription());
             ps.setTimestamp(3, Timestamp.valueOf(film.getReleaseDate().atStartOfDay()));
             ps.setLong(4, film.getDuration());
-            if (film.getMpa() == null || film.getMpa().getId() == null) {
-                throw new ValidationException("Рейтинг MPA обязателен");
-            }
             ps.setInt(5, film.getMpa().getId());
             return ps;
         }, keyHolder);
@@ -176,7 +180,6 @@ public class FilmRepository {
     }
 
     public Film update(Film film) {
-
         if (film.getMpa() == null || film.getMpa().getId() == null) {
             throw new ValidationException("Рейтинг MPA обязателен");
         }
@@ -211,26 +214,26 @@ public class FilmRepository {
     }
 
     public void addLike(long filmId, long userId) {
-        jdbcTemplate.update(ADD_LIKE_QUERY, userId, filmId);
+        jdbcTemplate.update(ADD_LIKE_QUERY, userId, filmId, userId, filmId);
     }
 
     public void removeLike(long filmId, long userId) {
         int rowsDeleted = jdbcTemplate.update(REMOVE_LIKE_QUERY, userId, filmId);
+        if (rowsDeleted == 0) {
+            log.debug("Лайк не найден для удаления: filmId={}, userId={}", filmId, userId);
+        }
     }
 
     public List<Film> getPopularFilms(int count) {
         List<Film> films = jdbcTemplate.query(GET_POPULAR_FILMS_QUERY, filmRowMapper, count);
 
         if (films.isEmpty()) return films;
+
         loadGenresForFilms(films);
         List<Long> filmIds = films.stream().map(Film::getId).toList();
 
-        String countQuery = """
-                SELECT film_id, COUNT(*) AS like_count
-                FROM likes
-                WHERE film_id IN (%s)
-                GROUP BY film_id
-                """.formatted(String.join(",", Collections.nCopies(filmIds.size(), "?")));
+        String inClause = String.join(",", Collections.nCopies(filmIds.size(), "?"));
+        String countQuery = "SELECT film_id, COUNT(*) AS like_count FROM likes WHERE film_id IN (" + inClause + ") GROUP BY film_id";
 
         Map<Long, Long> likesCountMap = jdbcTemplate.query(countQuery, rs -> {
             Map<Long, Long> map = new HashMap<>();
@@ -240,12 +243,7 @@ public class FilmRepository {
             return map;
         }, filmIds.toArray());
 
-        String usersQuery = """
-                SELECT film_id, user_id
-                FROM likes
-                WHERE film_id IN (%s)
-                """.formatted(String.join(",", Collections.nCopies(filmIds.size(), "?")));
-
+        String usersQuery = "SELECT film_id, user_id FROM likes WHERE film_id IN (" + inClause + ")";
         Map<Long, Set<Long>> likedUsersMap = new HashMap<>();
         jdbcTemplate.query(usersQuery, rs -> {
             while (rs.next()) {
@@ -262,8 +260,6 @@ public class FilmRepository {
 
         return films;
     }
-
-
 
     public void loadGenresForFilm(Film film) {
         if (film == null || film.getId() == null) return;
@@ -339,6 +335,6 @@ public class FilmRepository {
     public boolean exists(long id) {
         String sql = "SELECT COUNT(*) FROM films WHERE film_id = ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
-        return count > 0;
+        return count != null && count > 0;
     }
 }
