@@ -4,9 +4,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.dal.FilmRepository;
 import ru.yandex.practicum.filmorate.dal.GenreRepository;
+import ru.yandex.practicum.filmorate.dal.MpaRepository;
 import ru.yandex.practicum.filmorate.exception.FilmNotFoundException;
 import ru.yandex.practicum.filmorate.exception.InvalidDurationException;
 import ru.yandex.practicum.filmorate.exception.InvalidReleaseDateException;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 
@@ -21,6 +23,7 @@ public class FilmService {
 
     private final FilmRepository filmRepository;
     private final GenreRepository genreRepository;
+    private final MpaRepository mpaRepository;
 
     public Film create(Film film) {
         validate(film);
@@ -85,6 +88,9 @@ public class FilmService {
         if (film.getMpa() == null || film.getMpa().getId() == null) {
             throw new ValidationException("Рейтинг MPA обязателен");
         }
+        if (mpaRepository.findById(film.getMpa().getId()).isEmpty()) {
+            throw new NotFoundException("Неизвестный рейтинг MPA: " + film.getMpa().getId());
+        }
     }
 
     private void validateGenres(Set<Integer> genreIds) {
@@ -93,7 +99,7 @@ public class FilmService {
                 .filter(id -> genreRepository.findById(id).isEmpty())
                 .toList();
         if (!invalid.isEmpty()) {
-            throw new ValidationException("Неизвестные жанры: " + invalid);
+            throw new NotFoundException("Жанры не найдены: " + invalid);
         }
     }
 }

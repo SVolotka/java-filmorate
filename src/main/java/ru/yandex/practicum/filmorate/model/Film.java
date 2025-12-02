@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@JsonInclude(JsonInclude.Include.NON_EMPTY)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class Film {
     private Long id;
     @NotBlank(message = "Название фильма не может быть null или пустым")
@@ -35,7 +35,7 @@ public class Film {
     @NotNull(message = "Рейтинг MPA обязателен")
     private Mpa mpa;
 
-    private LinkedHashSet<Genre> genres = new LinkedHashSet<>();
+    private Set<Genre> genres = new LinkedHashSet<>();
 
     @JsonIgnore
    private Set<Long> userIds = new HashSet<>();

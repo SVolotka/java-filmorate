@@ -25,7 +25,7 @@ public class UserRepository {
     private static final String FIND_BY_ID_QUERY = "SELECT user_id, email, login, name, birthday FROM users WHERE user_id = ?";
     private static final String INSERT_QUERY = "INSERT INTO users (login, name, email, birthday) VALUES (?, ?, ?, ?)";
     private static final String UPDATE_QUERY = "UPDATE users SET login = ?, name = ?, email = ?, birthday = ? WHERE user_id = ?";
-    private static final String ADD_FRIEND_QUERY = "INSERT INTO friends (user_id, friend_id) VALUES (?, ?";
+    private static final String ADD_FRIEND_QUERY = "INSERT INTO friends (user_id, friend_id) VALUES (?, ?)";
     private static final String REMOVE_FRIEND_QUERY = "DELETE FROM friends WHERE user_id = ? AND friend_id = ?";
 
     private static final String GET_FRIENDS_QUERY = """

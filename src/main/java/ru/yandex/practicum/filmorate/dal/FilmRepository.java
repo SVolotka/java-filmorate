@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 import ru.yandex.practicum.filmorate.dal.mappers.FilmRowMapper;
 import ru.yandex.practicum.filmorate.dal.mappers.GenreRowMapper;
 import ru.yandex.practicum.filmorate.exception.InternalServerException;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Genre;
@@ -23,7 +24,6 @@ import java.util.Objects;
 import java.util.Set;
 
 @Repository
-//@RequiredArgsConstructor
 public class FilmRepository {
 
     private static final String FIND_ALL_QUERY = """
@@ -101,14 +101,21 @@ public class FilmRepository {
     private final JdbcTemplate jdbcTemplate;
     private final FilmRowMapper filmRowMapper;
     private final GenreRowMapper genreRowMapper;
+    private final MpaRepository mpaRepository;
+    private final GenreRepository genreRepository;
 
-
-    public FilmRepository(JdbcTemplate jdbcTemplate, FilmRowMapper filmRowMapper, GenreRowMapper genreRowMapper) {
+    public FilmRepository(JdbcTemplate jdbcTemplate,
+                          FilmRowMapper filmRowMapper,
+                          GenreRowMapper genreRowMapper,
+                          MpaRepository mpaRepository,
+                          GenreRepository genreRepository) {
         this.jdbcTemplate = jdbcTemplate;
         this.filmRowMapper = filmRowMapper;
         this.genreRowMapper = genreRowMapper;
-        System.out.println("GenreRowMapper: " + genreRowMapper); // ← будет null?
+        this.mpaRepository = mpaRepository;
+        this.genreRepository = genreRepository;
     }
+
 
     public List<Film> findAll() {
         List<Film> films = jdbcTemplate.query(FIND_ALL_QUERY, filmRowMapper);
@@ -121,6 +128,22 @@ public class FilmRepository {
 
     public Film create(Film film) {
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
+
+        if (film.getMpa() == null || film.getMpa().getId() == null) {
+            throw new ValidationException("Рейтинг MPA обязателен");
+        }
+        if (mpaRepository.findById(film.getMpa().getId()).isEmpty()) {
+            throw new NotFoundException("Рейтинг MPA с id=" + film.getMpa().getId() + " не найден");
+        }
+
+        if (film.getGenreIds() != null && !film.getGenreIds().isEmpty()) {
+            for (Integer genreId : film.getGenreIds()) {
+                if (genreRepository.findById(genreId).isEmpty()) {
+                    throw new NotFoundException("Жанр с id=" + genreId + " не найден");
+                }
+            }
+        }
+
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(INSERT_QUERY, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, film.getName());
@@ -153,6 +176,22 @@ public class FilmRepository {
     }
 
     public Film update(Film film) {
+
+        if (film.getMpa() == null || film.getMpa().getId() == null) {
+            throw new ValidationException("Рейтинг MPA обязателен");
+        }
+        if (mpaRepository.findById(film.getMpa().getId()).isEmpty()) {
+            throw new NotFoundException("Рейтинг MPA с id=" + film.getMpa().getId() + " не найден");
+        }
+
+        if (film.getGenreIds() != null && !film.getGenreIds().isEmpty()) {
+            for (Integer genreId : film.getGenreIds()) {
+                if (genreRepository.findById(genreId).isEmpty()) {
+                    throw new NotFoundException("Жанр с id=" + genreId + " не найден");
+                }
+            }
+        }
+
         int rowsUpdated = jdbcTemplate.update(UPDATE_QUERY,
                 film.getName(),
                 film.getDescription(),
