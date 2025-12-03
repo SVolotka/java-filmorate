@@ -1,6 +1,7 @@
 package ru.yandex.practicum.filmorate.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -11,11 +12,15 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class Film {
     private Long id;
     @NotBlank(message = "Название фильма не может быть null или пустым")
@@ -27,17 +32,33 @@ public class Film {
     @Positive(message = "Продолжительность фильма должна быть положительной")
     private long duration;
 
+    @NotNull(message = "Рейтинг MPA обязателен")
+    private Mpa mpa;
+
+    private Set<Genre> genres = new LinkedHashSet<>();
+
     @JsonIgnore
    private Set<Long> userIds = new HashSet<>();
 
     @JsonIgnore
     private Long rate = 0L;
 
-    public Film(Long id, String name, String description, LocalDate releaseDate, long duration) {
-        this.id = id;
-        this.name = name;
-        this.description = description;
-        this.releaseDate = releaseDate;
-        this.duration = duration;
+    public void setGenres(Set<Genre> genres) {
+        if (genres == null || genres.isEmpty()) {
+            this.genres = new LinkedHashSet<>();
+        } else {
+            this.genres = new LinkedHashSet<>(genres);
+        }
+    }
+
+    public Integer getMpaId() {
+        return mpa != null ? mpa.getId() : null;
+    }
+
+    public Set<Integer> getGenreIds() {
+        return genres.stream()
+                .map(Genre::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 }
