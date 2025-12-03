@@ -1,7 +1,6 @@
 package ru.yandex.practicum.filmorate.dal;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -25,7 +24,14 @@ public class UserRepository {
     private static final String FIND_BY_ID_QUERY = "SELECT user_id, email, login, name, birthday FROM users WHERE user_id = ?";
     private static final String INSERT_QUERY = "INSERT INTO users (login, name, email, birthday) VALUES (?, ?, ?, ?)";
     private static final String UPDATE_QUERY = "UPDATE users SET login = ?, name = ?, email = ?, birthday = ? WHERE user_id = ?";
-    private static final String ADD_FRIEND_QUERY = "INSERT INTO friends (user_id, friend_id) VALUES (?, ?)";
+
+    private static final String ADD_FRIEND_QUERY = """
+        INSERT INTO friends (user_id, friend_id)
+        SELECT ?, ? WHERE NOT EXISTS (
+            SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?
+        )
+        """;
+
     private static final String REMOVE_FRIEND_QUERY = "DELETE FROM friends WHERE user_id = ? AND friend_id = ?";
 
     private static final String GET_FRIENDS_QUERY = """
@@ -116,7 +122,6 @@ public class UserRepository {
         if (userId == friendId) {
             throw new ValidationException("User cannot add themselves as friend");
         }
-
         if (!exists(userId)) {
             throw new NotFoundException("User with id=" + userId + " not found");
         }
@@ -128,13 +133,8 @@ public class UserRepository {
             throw new ValidationException("Users " + userId + " and " + friendId + " are already friends");
         }
 
-        try {
-            jdbcTemplate.update(ADD_FRIEND_QUERY, friendId, userId);
-            jdbcTemplate.update(ADD_FRIEND_QUERY, userId, friendId);
-        } catch (DataIntegrityViolationException e) {
-            jdbcTemplate.update(REMOVE_FRIEND_QUERY, friendId, userId);
-            throw new ValidationException("Failed to establish friendship: " + e.getMessage());
-        }
+        jdbcTemplate.update(ADD_FRIEND_QUERY, userId, friendId, userId, friendId);
+        jdbcTemplate.update(ADD_FRIEND_QUERY, friendId, userId, friendId, userId);
     }
 
     public void removeFriend(long userId, long friendId) {
