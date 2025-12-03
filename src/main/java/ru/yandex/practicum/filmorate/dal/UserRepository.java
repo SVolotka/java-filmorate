@@ -128,13 +128,10 @@ public class UserRepository {
         if (!exists(friendId)) {
             throw new NotFoundException("User with id=" + friendId + " not found");
         }
-
         if (isFriend(userId, friendId)) {
             throw new ValidationException("Users " + userId + " and " + friendId + " are already friends");
         }
-
         jdbcTemplate.update(ADD_FRIEND_QUERY, userId, friendId, userId, friendId);
-        jdbcTemplate.update(ADD_FRIEND_QUERY, friendId, userId, friendId, userId);
     }
 
     public void removeFriend(long userId, long friendId) {
@@ -144,9 +141,7 @@ public class UserRepository {
         if (!exists(friendId)) {
             throw new NotFoundException("User with id=" + friendId + " not found");
         }
-
         jdbcTemplate.update(REMOVE_FRIEND_QUERY, userId, friendId);
-        jdbcTemplate.update(REMOVE_FRIEND_QUERY, friendId, userId);
     }
 
     public List<User> getFriends(long userId) {
