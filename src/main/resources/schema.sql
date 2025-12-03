@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS films (
   film_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name varchar(255),
   description varchar(255),
-  releaseDate TIMESTAMP,
+  release_date TIMESTAMP,
   duration BIGINT,
   mpa_id INTEGER REFERENCES mpa_rating(rating_id) ON DELETE SET NULL
 );

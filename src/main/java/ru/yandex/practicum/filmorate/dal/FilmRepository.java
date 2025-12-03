@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Repository
 @Slf4j
@@ -33,7 +34,7 @@ public class FilmRepository {
                     f.film_id,
                     f.name,
                     f.description,
-                    f.releaseDate,
+                    f.release_date,
                     f.duration,
                     f.mpa_id,
                     m.name as mpa_name
@@ -46,7 +47,7 @@ public class FilmRepository {
                     f.film_id,
                     f.name,
                     f.description,
-                    f.releaseDate,
+                    f.release_date,
                     f.duration,
                     f.mpa_id,
                     m.name as mpa_name
@@ -56,11 +57,11 @@ public class FilmRepository {
             """;
 
     private static final String INSERT_QUERY =
-            "INSERT INTO films (name, description, releaseDate, duration, mpa_id) VALUES (?, ?, ?, ?, ?)";
+            "INSERT INTO films (name, description, release_date, duration, mpa_id) VALUES (?, ?, ?, ?, ?)";
 
     private static final String UPDATE_QUERY = """
                 UPDATE films
-                SET name = ?, description = ?, releaseDate = ?, duration = ?, mpa_id = ?
+                SET name = ?, description = ?, release_date = ?, duration = ?, mpa_id = ?
                 WHERE film_id = ?
             """;
 
@@ -81,7 +82,7 @@ public class FilmRepository {
                 f.film_id,
                 f.name,
                 f.description,
-                f.releaseDate,
+                f.release_date,
                 f.duration,
                 f.mpa_id,
                 m.name AS mpa_name
@@ -96,12 +97,12 @@ public class FilmRepository {
             """;
 
     private static final String FIND_GENRES_BY_FILM_ID = """
-    SELECT g.genre_id, g.name
-    FROM film_genre fg
-    JOIN genres g ON fg.genre_id = g.genre_id
-    WHERE fg.film_id = ?
-    ORDER BY g.genre_id
-    """;
+            SELECT g.genre_id, g.name
+            FROM film_genre fg
+            JOIN genres g ON fg.genre_id = g.genre_id
+            WHERE fg.film_id = ?
+            ORDER BY g.genre_id
+            """;
 
     private static final String DELETE_GENRES_BY_FILM_ID = "DELETE FROM film_genre WHERE film_id = ?";
     private static final String INSERT_FILM_GENRE = "INSERT INTO film_genre (film_id, genre_id) VALUES (?, ?)";
@@ -144,14 +145,22 @@ public class FilmRepository {
         }
 
         if (film.getGenreIds() != null && !film.getGenreIds().isEmpty()) {
-            for (Integer genreId : film.getGenreIds()) {
-                if (genreRepository.findById(genreId).isEmpty()) {
-                    throw new NotFoundException("Жанр с id=" + genreId + " не найден");
-                }
+            Set<Integer> uniqueGenreIds = new HashSet<>(film.getGenreIds());
+            List<Genre> existingGenres = genreRepository.findAllById(uniqueGenreIds);
+
+            if (existingGenres.size() != uniqueGenreIds.size()) {
+                Set<Integer> existingIds = existingGenres.stream()
+                        .map(Genre::getId)
+                        .collect(Collectors.toSet());
+
+                Set<Integer> notFoundIds = new HashSet<>(uniqueGenreIds);
+                notFoundIds.removeAll(existingIds);
+
+                throw new NotFoundException("Жанры с id=" + notFoundIds + " не найдены");
             }
         }
 
-        jdbcTemplate.update(connection -> {
+        int rowsAffected = jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(INSERT_QUERY, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, film.getName());
             ps.setString(2, film.getDescription());
@@ -161,12 +170,16 @@ public class FilmRepository {
             return ps;
         }, keyHolder);
 
+        if (rowsAffected == 0) {
+            throw new InternalServerException("Не удалось создать фильм");
+        }
+
         Long id = keyHolder.getKeyAs(Long.class);
         if (id == null) {
-            throw new InternalServerException("Не удалось сохранить данные");
+            throw new InternalServerException("Не удалось получить ID созданного фильма");
         }
-        film.setId(id);
 
+        film.setId(id);
         updateGenres(id, film.getGenreIds());
 
         return film;
@@ -188,10 +201,19 @@ public class FilmRepository {
         }
 
         if (film.getGenreIds() != null && !film.getGenreIds().isEmpty()) {
-            for (Integer genreId : film.getGenreIds()) {
-                if (genreRepository.findById(genreId).isEmpty()) {
-                    throw new NotFoundException("Жанр с id=" + genreId + " не найден");
-                }
+            Set<Integer> uniqueGenreIds = new HashSet<>(film.getGenreIds());
+
+            List<Genre> existingGenres = genreRepository.findAllById(uniqueGenreIds);
+
+            if (existingGenres.size() != uniqueGenreIds.size()) {
+                Set<Integer> existingIds = existingGenres.stream()
+                        .map(Genre::getId)
+                        .collect(Collectors.toSet());
+
+                Set<Integer> notFoundIds = new HashSet<>(uniqueGenreIds);
+                notFoundIds.removeAll(existingIds);
+
+                throw new NotFoundException("Жанры с id=" + notFoundIds + " не найдены");
             }
         }
 
@@ -262,7 +284,9 @@ public class FilmRepository {
     }
 
     public void loadGenresForFilm(Film film) {
-        if (film == null || film.getId() == null) return;
+        if (film == null || film.getId() == null) {
+            return;
+        }
 
         List<Genre> genres = jdbcTemplate.query(
                 FIND_GENRES_BY_FILM_ID,
@@ -273,23 +297,27 @@ public class FilmRepository {
     }
 
     public void loadGenresForFilms(List<Film> films) {
-        if (films.isEmpty()) return;
+        if (films.isEmpty()) {
+            return;
+        }
 
         List<Long> filmIds = films.stream()
                 .map(Film::getId)
                 .filter(Objects::nonNull)
                 .toList();
 
-        if (filmIds.isEmpty()) return;
+        if (filmIds.isEmpty()) {
+            return;
+        }
 
         String inClause = String.join(",", Collections.nCopies(filmIds.size(), "?"));
         String query = """
-        SELECT fg.film_id, g.genre_id, g.name
-        FROM film_genre fg
-        JOIN genres g ON fg.genre_id = g.genre_id
-        WHERE fg.film_id IN (%s)
-        ORDER BY fg.film_id, g.genre_id
-        """.formatted(inClause);
+                SELECT fg.film_id, g.genre_id, g.name
+                FROM film_genre fg
+                JOIN genres g ON fg.genre_id = g.genre_id
+                WHERE fg.film_id IN (%s)
+                ORDER BY fg.film_id, g.genre_id
+                """.formatted(inClause);
 
         Map<Long, Set<Genre>> genresByFilmId = new HashMap<>();
         jdbcTemplate.query(query, rs -> {
@@ -315,7 +343,9 @@ public class FilmRepository {
     }
 
     private void loadLikesForFilm(Film film) {
-        if (film == null || film.getId() == null) return;
+        if (film == null || film.getId() == null) {
+            return;
+        }
 
         Long count = jdbcTemplate.queryForObject(
                 GET_LIKES_COUNT_QUERY,
