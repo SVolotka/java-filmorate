@@ -2,74 +2,85 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.dal.UserRepository;
+import ru.yandex.practicum.filmorate.exception.UserNotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
-import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
-import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
-import java.util.HashSet;
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
-    private long counter = 0L;
 
-    private final UserStorage userStorage;
-    private final FilmStorage filmStorage;
+    private final UserRepository userRepository;
 
     public User create(User user) {
         validateUser(user);
         checkAndSetName(user);
-        user.setId(++counter);
-        if (user.getFriends() == null) {
-            user.setFriends(new HashSet<>());
-        }
-        userStorage.create(user);
-        return user;
+        return userRepository.create(user);
     }
 
     public User get(long id) {
-        return userStorage.get(id);
+        if (!userRepository.exists(id)) {
+            throw new UserNotFoundException("User with id=" + id + " not found");
+        }
+        return userRepository.get(id);
     }
 
     public List<User> findAll() {
-        return userStorage.getAll();
+        return userRepository.findAll();
     }
 
     public User update(User user) {
-        userStorage.get(user.getId());
         validateUser(user);
         checkAndSetName(user);
-        userStorage.update(user);
-        return userStorage.get(user.getId());
+        if (!userRepository.exists(user.getId())) {
+            throw new UserNotFoundException("User with id=" + user.getId() + " not found");
+        }
+        return userRepository.update(user);
     }
 
-    public void addFriend(long firstId, long secondId) {
-        if (firstId == secondId) {
-            throw new ValidationException("User cannot add themselves as friend");
+    public void addFriend(long userId, long friendId) {
+        if (!userRepository.exists(userId)) {
+            throw new UserNotFoundException("User with id=" + userId + " not found");
         }
-        userStorage.addFriend(firstId, secondId);
+        if (!userRepository.exists(friendId)) {
+            throw new UserNotFoundException("User with id=" + friendId + " not found");
+        }
+        userRepository.addFriend(userId, friendId);
     }
 
-    public void removeFriend(long firstId, long secondId) {
-        if (firstId == secondId) {
-            throw new ValidationException("User cannot remove themselves as friend");
+    public void removeFriend(long userId, long friendId) {
+        if (!userRepository.exists(userId)) {
+            throw new UserNotFoundException("User with id=" + userId + " not found");
         }
-        userStorage.removeFriend(firstId, secondId);
+        if (!userRepository.exists(friendId)) {
+            throw new UserNotFoundException("User with id=" + friendId + " not found");
+        }
+        userRepository.removeFriend(userId, friendId);
     }
 
     public List<User> getFriendsById(long id) {
-        return userStorage.getFriendsById(id);
+        if (!userRepository.exists(id)) {
+            throw new UserNotFoundException("User with id=" + id + " not found");
+        }
+        return userRepository.getFriends(id);
     }
 
-    public List<User> getCommonFriends(long firstId, long secondId) {
-        return userStorage.getCommonFriends(firstId, secondId);
+    public List<User> getCommonFriends(long userId, long friendId) {
+        if (!userRepository.exists(userId)) {
+            throw new UserNotFoundException("User with id=" + userId + " not found");
+        }
+        if (!userRepository.exists(friendId)) {
+            throw new UserNotFoundException("User with id=" + friendId + " not found");
+        }
+        return userRepository.getCommonFriends(userId, friendId);
     }
 
     private void checkAndSetName(User user) {
-        String name = user.getName();
-        if (name == null || name.isBlank()) {
+        if (user.getName() == null || user.getName().isBlank()) {
             user.setName(user.getLogin());
         }
     }
@@ -84,10 +95,10 @@ public class UserService {
         if (user.getLogin() == null || user.getLogin().isBlank()) {
             throw new ValidationException("Login cannot be null or blank");
         }
-        if (user.getLogin().contains(" ")) {
-            throw new ValidationException("Login cannot contain spaces");
+        if (user.getLogin().chars().anyMatch(Character::isWhitespace)) {
+            throw new ValidationException("Login cannot contain whitespace characters");
         }
-        if (user.getBirthday() != null && user.getBirthday().isAfter(java.time.LocalDate.now())) {
+        if (user.getBirthday() != null && user.getBirthday().isAfter(LocalDate.now())) {
             throw new ValidationException("Birthday cannot be in the future");
         }
     }

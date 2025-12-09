@@ -10,6 +10,8 @@ import ru.yandex.practicum.filmorate.exception.FilmAlreadyExistException;
 import ru.yandex.practicum.filmorate.exception.FilmNotFoundException;
 import ru.yandex.practicum.filmorate.exception.InvalidDurationException;
 import ru.yandex.practicum.filmorate.exception.InvalidReleaseDateException;
+import ru.yandex.practicum.filmorate.exception.MpaNotFoundException;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.UserAlreadyExistException;
 import ru.yandex.practicum.filmorate.exception.UserNotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
@@ -18,6 +20,13 @@ import ru.yandex.practicum.filmorate.model.ErrorResponse;
 @RestControllerAdvice
 @Slf4j
 public class ErrorHandler {
+
+    @ExceptionHandler
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleNotFound(final NotFoundException exception) {
+        log.warn("Не найден объект: {}", exception.getMessage());
+        return ErrorResponse.builder().errorCode(HttpStatus.NOT_FOUND.value()).description(exception.getMessage()).build();
+    }
 
     @ExceptionHandler
     @ResponseStatus(HttpStatus.NOT_FOUND)
@@ -93,5 +102,12 @@ public class ErrorHandler {
                 .errorCode(HttpStatus.BAD_REQUEST.value())
                 .description(errorMessage)
                 .build();
+    }
+
+    @ExceptionHandler
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleMpaNotFoundException(MpaNotFoundException exception) {
+        log.error(exception.getMessage());
+        return ErrorResponse.builder().errorCode(HttpStatus.NOT_FOUND.value()).description(exception.getMessage()).build();
     }
 }
