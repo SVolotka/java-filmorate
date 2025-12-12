@@ -239,11 +239,11 @@ public class FilmRepository {
         }
     }
 
-    public List<Film> getPopularFilms(int count, Integer genreId, Integer year) {
+    public List<Film> getPopularFilms(Integer count, Integer genreId, Integer year) {  // меняем int на Integer
         StringBuilder queryBuilder = new StringBuilder();
         List<Object> params = new ArrayList<>();
 
-        // Базовый запрос с подзапросом для подсчета лайков
+        // Базовый запрос
         queryBuilder.append("""
         SELECT
             f.film_id,
@@ -252,15 +252,9 @@ public class FilmRepository {
             f.release_date,
             f.duration,
             f.mpa_id,
-            m.name as mpa_name,
-            COALESCE(l.like_count, 0) as like_count
+            m.name as mpa_name
         FROM films f
         LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
-        LEFT JOIN (
-            SELECT film_id, COUNT(*) as like_count
-            FROM likes
-            GROUP BY film_id
-        ) l ON f.film_id = l.film_id
         """);
 
         // Добавляем JOIN для фильтрации по жанру если нужно
@@ -270,27 +264,29 @@ public class FilmRepository {
         }
 
         // Добавляем WHERE для фильтрации по году если нужно
+        boolean hasWhere = false;
         if (year != null) {
             queryBuilder.append(" WHERE EXTRACT(YEAR FROM f.release_date) = ? ");
             params.add(year);
+            hasWhere = true;
         }
 
-        // Сортируем по количеству лайков (убывание), затем по ID
-        queryBuilder.append(" ORDER BY COALESCE(l.like_count, 0) DESC, f.film_id ");
+        // Сортируем по количеству лайков
+        queryBuilder.append(" ORDER BY (SELECT COUNT(*) FROM likes l WHERE l.film_id = f.film_id) DESC ");
 
-        // Лимит
-        queryBuilder.append(" LIMIT ? ");
-        params.add(count);
+        // Добавляем LIMIT только если count указан и больше 0
+        if (count != null && count > 0) {
+            queryBuilder.append(" LIMIT ? ");
+            params.add(count);
+        }
 
         String query = queryBuilder.toString();
         List<Film> films = jdbcTemplate.query(query, filmRowMapper, params.toArray());
 
         if (!films.isEmpty()) {
             loadGenresForFilms(films);
-            // Устанавливаем количество лайков из результата запроса
             for (Film film : films) {
-                // Количество лайков уже в like_count из запроса
-                // Нужно передать его в film.setRate()
+                loadLikesForFilm(film);
             }
         }
 

@@ -74,16 +74,16 @@ public class FilmController {
 
     @GetMapping("/popular")
     public List<Film> getPopular(
-            @RequestParam(defaultValue = "10") int count,
+            @RequestParam(required = false) Integer count,  // меняем int на Integer и убираем defaultValue
             @RequestParam(required = false) Integer genreId,
             @RequestParam(required = false) Integer year) {
 
-        log.info("Получен HTTP-запрос на получение популярных фильмов: count={}, genreId={}, year={}",
-                count, genreId, year);
+        // Если count не указан, передаем null в сервис
+        log.info("Получен HTTP-запрос: count={}, genreId={}, year={}", count, genreId, year);
 
         List<Film> popularFilms = filmService.getPopular(count, genreId, year);
+        log.info("Возвращено {} фильмов", popularFilms.size());
 
-        log.info("Успешно обработан HTTP-запрос, найдено {} фильмов", popularFilms.size());
         return popularFilms;
     }
 
