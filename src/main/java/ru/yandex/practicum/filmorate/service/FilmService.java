@@ -15,7 +15,6 @@ import ru.yandex.practicum.filmorate.model.Film;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
-import lombok.extern.slf4j.Slf4j;
 import java.util.Comparator;
 import java.util.stream.Collectors;
 
