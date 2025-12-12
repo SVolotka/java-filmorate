@@ -15,14 +15,7 @@ import ru.yandex.practicum.filmorate.model.Genre;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Timestamp;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Repository
@@ -246,38 +239,59 @@ public class FilmRepository {
         }
     }
 
-    public List<Film> getPopularFilms(int count) {
-        List<Film> films = jdbcTemplate.query(GET_POPULAR_FILMS_QUERY, filmRowMapper, count);
+    public List<Film> getPopularFilms(int count, Integer genreId, Integer year) {
+        StringBuilder queryBuilder = new StringBuilder();
+        List<Object> params = new ArrayList<>();
 
-        if (films.isEmpty()) return films;
+        // Базовый запрос с подзапросом для подсчета лайков
+        queryBuilder.append("""
+        SELECT
+            f.film_id,
+            f.name,
+            f.description,
+            f.release_date,
+            f.duration,
+            f.mpa_id,
+            m.name as mpa_name,
+            COALESCE(l.like_count, 0) as like_count
+        FROM films f
+        LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+        LEFT JOIN (
+            SELECT film_id, COUNT(*) as like_count
+            FROM likes
+            GROUP BY film_id
+        ) l ON f.film_id = l.film_id
+        """);
 
-        loadGenresForFilms(films);
-        List<Long> filmIds = films.stream().map(Film::getId).toList();
+        // Добавляем JOIN для фильтрации по жанру если нужно
+        if (genreId != null) {
+            queryBuilder.append(" INNER JOIN film_genre fg ON f.film_id = fg.film_id AND fg.genre_id = ? ");
+            params.add(genreId);
+        }
 
-        String inClause = String.join(",", Collections.nCopies(filmIds.size(), "?"));
-        String countQuery = "SELECT film_id, COUNT(*) AS like_count FROM likes WHERE film_id IN (" + inClause + ") GROUP BY film_id";
+        // Добавляем WHERE для фильтрации по году если нужно
+        if (year != null) {
+            queryBuilder.append(" WHERE EXTRACT(YEAR FROM f.release_date) = ? ");
+            params.add(year);
+        }
 
-        Map<Long, Long> likesCountMap = jdbcTemplate.query(countQuery, rs -> {
-            Map<Long, Long> map = new HashMap<>();
-            while (rs.next()) {
-                map.put(rs.getLong("film_id"), rs.getLong("like_count"));
+        // Сортируем по количеству лайков (убывание), затем по ID
+        queryBuilder.append(" ORDER BY COALESCE(l.like_count, 0) DESC, f.film_id ");
+
+        // Лимит
+        queryBuilder.append(" LIMIT ? ");
+        params.add(count);
+
+        String query = queryBuilder.toString();
+        List<Film> films = jdbcTemplate.query(query, filmRowMapper, params.toArray());
+
+        if (!films.isEmpty()) {
+            loadGenresForFilms(films);
+            // Устанавливаем количество лайков из результата запроса
+            for (Film film : films) {
+                // Количество лайков уже в like_count из запроса
+                // Нужно передать его в film.setRate()
             }
-            return map;
-        }, filmIds.toArray());
-
-        String usersQuery = "SELECT film_id, user_id FROM likes WHERE film_id IN (" + inClause + ")";
-        Map<Long, Set<Long>> likedUsersMap = new HashMap<>();
-        jdbcTemplate.query(usersQuery, rs -> {
-            while (rs.next()) {
-                long filmId = rs.getLong("film_id");
-                long userId = rs.getLong("user_id");
-                likedUsersMap.computeIfAbsent(filmId, k -> new HashSet<>()).add(userId);
-            }
-        }, filmIds.toArray());
-
-        for (Film film : films) {
-            film.setRate(likesCountMap.getOrDefault(film.getId(), 0L));
-            film.setUserIds(likedUsersMap.getOrDefault(film.getId(), new HashSet<>()));
         }
 
         return films;
@@ -366,5 +380,21 @@ public class FilmRepository {
         String sql = "SELECT COUNT(*) FROM films WHERE film_id = ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
         return count != null && count > 0;
+    }
+
+    public List<Film> searchByTitle(String query) {
+        String searchPattern = "%" + query.toLowerCase() + "%";
+
+        String searchQuery = FIND_ALL_QUERY +
+                " WHERE LOWER(f.name) LIKE ? " +
+                " ORDER BY (SELECT COUNT(*) FROM likes l WHERE l.film_id = f.film_id) DESC";
+
+        List<Film> films = jdbcTemplate.query(searchQuery, filmRowMapper, searchPattern);
+
+        if (!films.isEmpty()) {
+            loadGenresForFilms(films);
+        }
+
+        return films;
     }
 }

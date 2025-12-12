@@ -1,6 +1,7 @@
 package ru.yandex.practicum.filmorate.controller;
 
 import jakarta.validation.Valid;
+import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -72,10 +73,51 @@ public class FilmController {
     }
 
     @GetMapping("/popular")
-    public List<Film> getPopular(@RequestParam(defaultValue = "10") int count) {
-        log.info("Получен HTTP-запрос на получение {} самых залайканых фильмов", count);
-        List<Film> popularFilms = filmService.getPopular(count);
-        log.info("Успешно обработан HTTP-запрос на получение {} самых залайканых фильмов", count);
+    public List<Film> getPopular(
+            @RequestParam(defaultValue = "10") int count,
+            @RequestParam(required = false) Integer genreId,
+            @RequestParam(required = false) Integer year) {
+
+        log.info("Получен HTTP-запрос на получение популярных фильмов: count={}, genreId={}, year={}",
+                count, genreId, year);
+
+        List<Film> popularFilms = filmService.getPopular(count, genreId, year);
+
+        log.info("Успешно обработан HTTP-запрос, найдено {} фильмов", popularFilms.size());
         return popularFilms;
+    }
+
+    @GetMapping("/search")
+    public List<Film> searchFilms(
+            @RequestParam String query,
+            @RequestParam(required = false, defaultValue = "title") String by) {
+
+        log.info("Получен HTTP-запрос на поиск фильмов: query={}, by={}", query, by);
+
+        // Валидация для 'by'
+        if (!isValidSearchParameter(by)) {
+            throw new ValidationException("Параметр 'by' должен быть 'title', 'director' или 'director,title'");
+        }
+
+        List<Film> foundFilms = filmService.searchFilms(query, by);
+        log.info("Успешно обработан HTTP-запрос на поиск, найдено {} фильмов", foundFilms.size());
+
+        return foundFilms;
+    }
+
+    private boolean isValidSearchParameter(String by) {
+        if (by == null || by.isBlank()) {
+            return false;
+        }
+
+        // Разделяем по запятой и проверяем каждый параметр
+        String[] params = by.split(",");
+        for (String param : params) {
+            String trimmed = param.trim().toLowerCase();
+            if (!trimmed.equals("title") && !trimmed.equals("director")) {
+                return false;
+            }
+        }
+        return true;
     }
 }
