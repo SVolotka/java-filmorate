@@ -1,7 +1,9 @@
 package ru.yandex.practicum.filmorate.dal.mappers;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
+import ru.yandex.practicum.filmorate.dal.DirectorRepository;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Mpa;
 
@@ -10,7 +12,10 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 
 @Component
+@RequiredArgsConstructor
 public class FilmRowMapper implements RowMapper<Film> {
+
+    private final DirectorRepository directorRepository;
 
     @Override
     public Film mapRow(ResultSet rs, int rowNum) throws SQLException {

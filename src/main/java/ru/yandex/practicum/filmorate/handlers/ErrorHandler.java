@@ -1,6 +1,7 @@
 package ru.yandex.practicum.filmorate.handlers;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -25,21 +26,28 @@ public class ErrorHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleNotFound(final NotFoundException exception) {
         log.warn("Не найден объект: {}", exception.getMessage());
-        return ErrorResponse.builder().errorCode(HttpStatus.NOT_FOUND.value()).description(exception.getMessage()).build();
+        return ErrorResponse.builder().error(HttpStatus.NOT_FOUND.value()).description(exception.getMessage()).build();
+    }
+
+    @ExceptionHandler(EmptyResultDataAccessException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleEmptyResultDataAccessException(final EmptyResultDataAccessException exception) {
+        log.error("Не найден объект: {}", exception.getMessage());
+        return ErrorResponse.builder().error(HttpStatus.NOT_FOUND.value()).description(exception.getMessage()).build();
     }
 
     @ExceptionHandler
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleUserNotFoundException(UserNotFoundException exception) {
         log.error(exception.getMessage());
-        return ErrorResponse.builder().errorCode(HttpStatus.NOT_FOUND.value()).description(exception.getMessage()).build();
+        return ErrorResponse.builder().error(HttpStatus.NOT_FOUND.value()).description(exception.getMessage()).build();
     }
 
     @ExceptionHandler
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleFilmNotFoundException(FilmNotFoundException exception) {
         log.error(exception.getMessage());
-        return ErrorResponse.builder().errorCode(HttpStatus.NOT_FOUND.value()).description(exception.getMessage()).build();
+        return ErrorResponse.builder().error(HttpStatus.NOT_FOUND.value()).description(exception.getMessage()).build();
     }
 
     @ExceptionHandler
@@ -47,21 +55,21 @@ public class ErrorHandler {
     public ErrorResponse handleUncaught(Exception exception) {
         log.error(exception.getMessage());
         return ErrorResponse.builder()
-                .errorCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).description(exception.getMessage()).build();
+                .error(HttpStatus.INTERNAL_SERVER_ERROR.value()).description(exception.getMessage()).build();
     }
 
     @ExceptionHandler
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleUserAlreadyExistException(UserAlreadyExistException exception) {
         log.error(exception.getMessage());
-        return ErrorResponse.builder().errorCode(HttpStatus.CONFLICT.value()).description(exception.getMessage()).build();
+        return ErrorResponse.builder().error(HttpStatus.CONFLICT.value()).description(exception.getMessage()).build();
     }
 
     @ExceptionHandler
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleFilmAlreadyExistException(FilmAlreadyExistException exception) {
         log.error(exception.getMessage());
-        return ErrorResponse.builder().errorCode(HttpStatus.CONFLICT.value()).description(exception.getMessage()).build();
+        return ErrorResponse.builder().error(HttpStatus.CONFLICT.value()).description(exception.getMessage()).build();
     }
 
     @ExceptionHandler
@@ -69,7 +77,7 @@ public class ErrorHandler {
     public ErrorResponse handleInvalidDurationException(InvalidDurationException exception) {
         log.error(exception.getMessage());
         return ErrorResponse.builder()
-                .errorCode(HttpStatus.BAD_REQUEST.value()).description(exception.getMessage()).build();
+                .error(HttpStatus.BAD_REQUEST.value()).description(exception.getMessage()).build();
     }
 
     @ExceptionHandler
@@ -77,7 +85,7 @@ public class ErrorHandler {
     public ErrorResponse handleInvalidReleaseDateException(InvalidReleaseDateException exception) {
         log.error(exception.getMessage());
         return ErrorResponse.builder()
-                .errorCode(HttpStatus.BAD_REQUEST.value()).description(exception.getMessage()).build();
+                .error(HttpStatus.BAD_REQUEST.value()).description(exception.getMessage()).build();
     }
 
     @ExceptionHandler
@@ -85,7 +93,7 @@ public class ErrorHandler {
     public ErrorResponse handleValidationException(ValidationException exception) {
         log.error(exception.getMessage());
         return ErrorResponse.builder()
-                .errorCode(HttpStatus.BAD_REQUEST.value()).description(exception.getMessage()).build();
+                .error(HttpStatus.BAD_REQUEST.value()).description(exception.getMessage()).build();
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -99,7 +107,7 @@ public class ErrorHandler {
         log.error((errorMessage));
 
         return ErrorResponse.builder()
-                .errorCode(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.value())
                 .description(errorMessage)
                 .build();
     }
@@ -108,6 +116,6 @@ public class ErrorHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleMpaNotFoundException(MpaNotFoundException exception) {
         log.error(exception.getMessage());
-        return ErrorResponse.builder().errorCode(HttpStatus.NOT_FOUND.value()).description(exception.getMessage()).build();
+        return ErrorResponse.builder().error(HttpStatus.NOT_FOUND.value()).description(exception.getMessage()).build();
     }
 }
