@@ -6,10 +6,7 @@ import org.springframework.stereotype.Repository;
 import ru.yandex.practicum.filmorate.dal.mappers.GenreRowMapper;
 import ru.yandex.practicum.filmorate.model.Genre;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Repository
 @RequiredArgsConstructor
@@ -35,6 +32,16 @@ public class GenreRepository {
         } catch (org.springframework.dao.EmptyResultDataAccessException e) {
             return Optional.empty();
         }
+    }
+
+    public List<Genre> getGenresByFilmId(Long filmId) {
+        String sqlQuery = """
+                SELECT g.*
+                FROM genre AS g
+                LEFT JOIN genre_films AS gf ON g.id = gf.genre_id
+                LEFT JOIN films AS f ON gf.film_id = f.id
+                WHERE f.id = ?""";
+        return jdbcTemplate.query(sqlQuery, genreRowMapper, filmId);
     }
 
     public List<Genre> findAllById(Collection<Integer> ids) {

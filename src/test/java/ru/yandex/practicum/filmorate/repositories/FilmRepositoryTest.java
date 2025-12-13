@@ -8,6 +8,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
+import ru.yandex.practicum.filmorate.dal.DirectorRepository;
 import ru.yandex.practicum.filmorate.dal.FilmRepository;
 import ru.yandex.practicum.filmorate.dal.GenreRepository;
 import ru.yandex.practicum.filmorate.dal.MpaRepository;
@@ -21,7 +22,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @JdbcTest
-@Import({FilmRepository.class, FilmRowMapper.class, GenreRowMapper.class, MpaRepository.class, GenreRepository.class, MpaRowMapper.class})
+@Import({FilmRepository.class, FilmRowMapper.class, GenreRowMapper.class, MpaRepository.class, GenreRepository.class, MpaRowMapper.class, DirectorRepository.class})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Sql({"/schema.sql", "/data.sql"})
 @Transactional

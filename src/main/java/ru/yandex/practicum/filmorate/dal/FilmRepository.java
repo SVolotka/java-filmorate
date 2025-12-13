@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.dal;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -9,24 +10,17 @@ import ru.yandex.practicum.filmorate.dal.mappers.GenreRowMapper;
 import ru.yandex.practicum.filmorate.exception.InternalServerException;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.Director;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 
-import java.sql.PreparedStatement;
-import java.sql.Statement;
-import java.sql.Timestamp;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.sql.*;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Repository
 @Slf4j
+@RequiredArgsConstructor
 public class FilmRepository {
 
     private static final String FIND_ALL_QUERY = """
@@ -112,18 +106,7 @@ public class FilmRepository {
     private final GenreRowMapper genreRowMapper;
     private final MpaRepository mpaRepository;
     private final GenreRepository genreRepository;
-
-    public FilmRepository(JdbcTemplate jdbcTemplate,
-                          FilmRowMapper filmRowMapper,
-                          GenreRowMapper genreRowMapper,
-                          MpaRepository mpaRepository,
-                          GenreRepository genreRepository) {
-        this.jdbcTemplate = jdbcTemplate;
-        this.filmRowMapper = filmRowMapper;
-        this.genreRowMapper = genreRowMapper;
-        this.mpaRepository = mpaRepository;
-        this.genreRepository = genreRepository;
-    }
+    private final DirectorRepository directorRepository;
 
     public List<Film> findAll() {
         List<Film> films = jdbcTemplate.query(FIND_ALL_QUERY, filmRowMapper);
@@ -182,6 +165,19 @@ public class FilmRepository {
         film.setId(id);
         updateGenres(id, film.getGenreIds());
 
+        Optional<List<Director>> optDirector = Optional.ofNullable(film.getDirectors());
+        if (optDirector.isPresent()) {
+            Set<Director> directorSet = new HashSet<>(optDirector.get());
+            String sql = """
+                    INSERT INTO directors_films(director_id, film_id)
+                    VALUES(?, ?)
+                    """;
+            for (Director director : directorSet) {
+                jdbcTemplate.update(sql, director.getId(), film.getId());
+            }
+
+            film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
+        }
         return film;
     }
 
@@ -189,6 +185,7 @@ public class FilmRepository {
         Film film = jdbcTemplate.queryForObject(FIND_BY_ID_QUERY, filmRowMapper, id);
         loadGenresForFilm(film);
         loadLikesForFilm(film);
+        film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
         return film;
     }
 
@@ -215,6 +212,25 @@ public class FilmRepository {
 
                 throw new NotFoundException("Жанры с id=" + notFoundIds + " не найдены");
             }
+        }
+
+        Optional<Set<Genre>> result = Optional.ofNullable(film.getGenres());
+        if (result.isEmpty()) {
+            List<Genre> genres = genreRepository.getGenresByFilmId(film.getId());
+            film.setGenres(new HashSet<>(genres));
+        }
+
+        Optional<List<Director>> optDirector = Optional.ofNullable(film.getDirectors());
+        if (optDirector.isPresent() && !optDirector.get().isEmpty()) {
+            Set<Director> newDirectors = new HashSet<>(optDirector.get());
+            String sql = """
+                    INSERT INTO directors_films(film_id, director_id)
+                    VALUES(?, ?)
+                    """;
+            for (Director director : newDirectors) {
+                jdbcTemplate.update(sql, film.getId(), director.getId());
+            }
+            film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
         }
 
         int rowsUpdated = jdbcTemplate.update(UPDATE_QUERY,
@@ -366,5 +382,61 @@ public class FilmRepository {
         String sql = "SELECT COUNT(*) FROM films WHERE film_id = ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
         return count != null && count > 0;
+    }
+
+    public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
+        if (sortRule == null) {
+            throw new NotFoundException("Параметр для сортировки не задан.");
+        }
+
+        switch (sortRule) {
+            case "year" -> {
+                String sql = """
+                SELECT
+                    f.film_id,
+                    f.name,
+                    f.description,
+                    f.release_date,
+                    f.duration,
+                    f.mpa_id,
+                FROM films f
+                INNER JOIN directors_films df ON f.film_id = df.film_id
+                WHERE df.director_id = ?
+                ORDER BY f.release_date""";
+
+                return loadGenresAndDirectors(sql, directorId);
+            }
+            case "likes" -> {
+                String sql = """
+                SELECT
+                    f.film_id,
+                    f.name,
+                    f.description,
+                    f.release_date,
+                    f.duration,
+                    f.mpa_id,
+                    COUNT(l.like_id) AS likes_count
+                FROM films f
+                INNER JOIN directors_films df ON f.film_id = df.film_id
+                INNER JOIN likes l ON f.film_id = l.film_id
+                WHERE df.director_id = ?
+                GROUP BY
+                    f.film_id
+                ORDER BY COUNT(l.like_id) DESC""";
+
+                return loadGenresAndDirectors(sql, directorId);
+            }
+            default -> throw new NotFoundException("Такого параметра для сортировки не существует.");
+        }
+    }
+
+    private List<Film> loadGenresAndDirectors(String sql, Long directorId) {
+        List<Film> films = jdbcTemplate.query(sql, filmRowMapper, directorId);
+        for (Film film : films) {
+            List<Genre> genres = genreRepository.getGenresByFilmId(film.getId());
+            film.setGenres(new HashSet<>(genres));
+            film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
+        }
+        return films;
     }
 }

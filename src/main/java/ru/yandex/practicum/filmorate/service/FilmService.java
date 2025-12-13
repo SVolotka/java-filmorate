@@ -102,4 +102,8 @@ public class FilmService {
             throw new NotFoundException("Жанры не найдены: " + invalid);
         }
     }
+
+    public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
+        return filmRepository.getAllFilmsByDirectorAndSortedBy(directorId, sortRule);
+    }
 }
