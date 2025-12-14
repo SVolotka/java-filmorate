@@ -10,10 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Data
@@ -35,8 +32,10 @@ public class Film {
 
     private Set<Genre> genres = new LinkedHashSet<>();
 
+    private List<Director> directors = new ArrayList<>();
+
     @JsonIgnore
-   private Set<Long> userIds = new HashSet<>();
+    private Set<Long> userIds = new HashSet<>();
 
     @JsonIgnore
     private Long rate = 0L;
