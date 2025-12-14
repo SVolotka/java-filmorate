@@ -70,7 +70,7 @@ public class FilmService {
         filmRepository.removeLike(filmId, userId);
     }
 
-    public List<Film> getPopular(Integer count, Integer genreId, Integer year) {  // меняем int на Integer
+    public List<Film> getPopular(Integer count, Integer genreId, Integer year) {  // заменил метод Сергея
         // Валидация count если указан
         if (count != null && count <= 0) {
             throw new ValidationException("Параметр 'count' должен быть положительным числом");

@@ -73,7 +73,7 @@ public class FilmController {
     }
 
     @GetMapping("/popular")
-    public List<Film> getPopular(
+    public List<Film> getPopular( // заменил метод Сергея
             @RequestParam(required = false) Integer count,  // меняем int на Integer и убираем defaultValue
             @RequestParam(required = false) Integer genreId,
             @RequestParam(required = false) Integer year) {

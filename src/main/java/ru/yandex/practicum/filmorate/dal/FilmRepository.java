@@ -239,7 +239,7 @@ public class FilmRepository {
         }
     }
 
-    public List<Film> getPopularFilms(Integer count, Integer genreId, Integer year) {  // меняем int на Integer
+    public List<Film> getPopularFilms(Integer count, Integer genreId, Integer year) {  // заменил метод Сергея
         StringBuilder queryBuilder = new StringBuilder();
         List<Object> params = new ArrayList<>();
 
@@ -257,13 +257,11 @@ public class FilmRepository {
         LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
         """);
 
-        // Добавляем JOIN для фильтрации по жанру если нужно
         if (genreId != null) {
             queryBuilder.append(" INNER JOIN film_genre fg ON f.film_id = fg.film_id AND fg.genre_id = ? ");
             params.add(genreId);
         }
 
-        // Добавляем WHERE для фильтрации по году если нужно
         boolean hasWhere = false;
         if (year != null) {
             queryBuilder.append(" WHERE EXTRACT(YEAR FROM f.release_date) = ? ");
@@ -378,7 +376,7 @@ public class FilmRepository {
         return count != null && count > 0;
     }
 
-    public List<Film> searchByTitle(String query) {
+    public List<Film> searchByTitle(String query) { // добавил для задания по поиску
         String searchPattern = "%" + query.toLowerCase() + "%";
 
         String searchQuery = FIND_ALL_QUERY +
