@@ -4,6 +4,12 @@ DELETE FROM films;
 DELETE FROM users;
 DELETE FROM genres;
 DELETE FROM mpa_rating;
+DELETE FROM review_likes;
+DELETE FROM reviews;
+
+ALTER TABLE reviews ALTER COLUMN review_id RESTART WITH 1;
+ALTER TABLE users ALTER COLUMN user_id RESTART WITH 1;
+ALTER TABLE films ALTER COLUMN film_id RESTART WITH 1;
 
 INSERT INTO mpa_rating (rating_id, name) VALUES
   (1, 'G'),
@@ -37,3 +43,20 @@ INSERT INTO likes (user_id, film_id) VALUES
   (1, 1),
   (2, 1),
   (1, 2);
+
+INSERT INTO reviews (content, is_positive, user_id, film_id, useful)
+VALUES ('Отличный фильм!', true, 1, 1, 10);
+
+INSERT INTO reviews (content, is_positive, user_id, film_id, useful)
+VALUES ('Не понравилось', false, 2, 1, 5);
+
+INSERT INTO reviews (content, is_positive, user_id, film_id, useful)
+VALUES ('Средний фильм', true, 2, 2, 2);
+
+INSERT INTO reviews (content, is_positive, user_id, film_id, useful)
+VALUES ('Лучший фильм года!', true, 1, 2, 15);
+
+INSERT INTO review_likes (review_id, user_id, is_like)
+VALUES (1, 2, true);
+INSERT INTO review_likes (review_id, user_id, is_like)
+VALUES (2, 1, false);
