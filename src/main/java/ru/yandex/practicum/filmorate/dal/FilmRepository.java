@@ -15,9 +15,12 @@ import ru.yandex.practicum.filmorate.model.Genre;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -340,6 +343,63 @@ public class FilmRepository {
                 jdbcTemplate.update(INSERT_FILM_GENRE, filmId, genreId);
             }
         }
+    }
+
+    public List<Film> getCommonFilms(long userId, long friendId) {
+        String query = """
+    SELECT DISTINCT
+        f.film_id,
+        f.name,
+        f.description,
+        f.release_date,
+        f.duration,
+        f.mpa_id,
+        m.name as mpa_name,
+        g.genre_id,
+        g.name as genre_name
+    FROM films f
+    LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+    LEFT JOIN film_genre fg ON f.film_id = fg.film_id
+    LEFT JOIN genres g ON fg.genre_id = g.genre_id
+    WHERE f.film_id IN (
+        SELECT film_id FROM likes WHERE user_id = ?
+        INTERSECT
+        SELECT film_id FROM likes WHERE user_id = ?
+    )
+    ORDER BY f.film_id, g.genre_id
+    """;
+
+        Map<Long, Film> filmMap = new LinkedHashMap<>();
+
+        jdbcTemplate.query(query, rs -> {
+            long filmId = rs.getLong("film_id");
+            Film film = filmMap.get(filmId);
+
+            if (film == null) {
+                film = filmRowMapper.mapRow(rs, 0);
+                film.setGenres(new LinkedHashSet<>());
+                filmMap.put(filmId, film);
+            }
+
+            Integer genreId = rs.getInt("genre_id");
+            if (genreId > 0 && !rs.wasNull()) {
+                Genre genre = new Genre(
+                        genreId,
+                        rs.getString("genre_name")
+                );
+                film.getGenres().add(genre);
+            }
+        }, userId, friendId);
+
+        List<Film> films = new ArrayList<>(filmMap.values());
+
+        for (Film film : films) {
+            loadLikesForFilm(film);
+        }
+
+        films.sort(Comparator.comparing(Film::getRate).reversed());
+
+        return films;
     }
 
     private void loadLikesForFilm(Film film) {
