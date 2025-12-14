@@ -73,10 +73,10 @@ public class FilmController {
     }
 
     @GetMapping("/popular")
-    public List<Film> getPopular( // заменил метод Сергея
-            @RequestParam(required = false) Integer count,  // меняем int на Integer и убираем defaultValue
+    public List<Film> getPopular(
+            @RequestParam(required = false) Integer count,
             @RequestParam(required = false) Integer genreId,
-            @RequestParam(required = false) Integer year) {
+            @RequestParam(required = false) Integer year) { // заменил метод Сергея
 
         // Если count не указан, передаем null в сервис
         log.info("Получен HTTP-запрос: count={}, genreId={}, year={}", count, genreId, year);
