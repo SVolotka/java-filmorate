@@ -151,6 +151,7 @@ public class FilmService {
         return films.stream()
                 .sorted(Comparator.comparingLong(Film::getRate).reversed())
                 .collect(Collectors.toList());
+
     public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
         return filmRepository.getAllFilmsByDirectorAndSortedBy(directorId, sortRule);
     }
