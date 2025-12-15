@@ -262,38 +262,53 @@ public class FilmRepository {
         }
     }
 
-    public List<Film> getPopularFilms(int count) {
-        List<Film> films = jdbcTemplate.query(GET_POPULAR_FILMS_QUERY, filmRowMapper, count);
+    public List<Film> getPopularFilms(Integer count, Integer genreId, Integer year) {  // заменил метод Сергея
+        StringBuilder queryBuilder = new StringBuilder();
+        List<Object> params = new ArrayList<>();
 
-        if (films.isEmpty()) return films;
+        // Базовый запрос
+        queryBuilder.append("""
+        SELECT
+            f.film_id,
+            f.name,
+            f.description,
+            f.release_date,
+            f.duration,
+            f.mpa_id,
+            m.name as mpa_name
+        FROM films f
+        LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+        """);
 
-        loadGenresForFilms(films);
-        List<Long> filmIds = films.stream().map(Film::getId).toList();
+        if (genreId != null) {
+            queryBuilder.append(" INNER JOIN film_genre fg ON f.film_id = fg.film_id AND fg.genre_id = ? ");
+            params.add(genreId);
+        }
 
-        String inClause = String.join(",", Collections.nCopies(filmIds.size(), "?"));
-        String countQuery = "SELECT film_id, COUNT(*) AS like_count FROM likes WHERE film_id IN (" + inClause + ") GROUP BY film_id";
+        boolean hasWhere = false;
+        if (year != null) {
+            queryBuilder.append(" WHERE EXTRACT(YEAR FROM f.release_date) = ? ");
+            params.add(year);
+            hasWhere = true;
+        }
 
-        Map<Long, Long> likesCountMap = jdbcTemplate.query(countQuery, rs -> {
-            Map<Long, Long> map = new HashMap<>();
-            while (rs.next()) {
-                map.put(rs.getLong("film_id"), rs.getLong("like_count"));
+        // Сортируем по количеству лайков
+        queryBuilder.append(" ORDER BY (SELECT COUNT(*) FROM likes l WHERE l.film_id = f.film_id) DESC ");
+
+        // Добавляем LIMIT только если count указан и больше 0
+        if (count != null && count > 0) {
+            queryBuilder.append(" LIMIT ? ");
+            params.add(count);
+        }
+
+        String query = queryBuilder.toString();
+        List<Film> films = jdbcTemplate.query(query, filmRowMapper, params.toArray());
+
+        if (!films.isEmpty()) {
+            loadGenresForFilms(films);
+            for (Film film : films) {
+                loadLikesForFilm(film);
             }
-            return map;
-        }, filmIds.toArray());
-
-        String usersQuery = "SELECT film_id, user_id FROM likes WHERE film_id IN (" + inClause + ")";
-        Map<Long, Set<Long>> likedUsersMap = new HashMap<>();
-        jdbcTemplate.query(usersQuery, rs -> {
-            while (rs.next()) {
-                long filmId = rs.getLong("film_id");
-                long userId = rs.getLong("user_id");
-                likedUsersMap.computeIfAbsent(filmId, k -> new HashSet<>()).add(userId);
-            }
-        }, filmIds.toArray());
-
-        for (Film film : films) {
-            film.setRate(likesCountMap.getOrDefault(film.getId(), 0L));
-            film.setUserIds(likedUsersMap.getOrDefault(film.getId(), new HashSet<>()));
         }
 
         return films;
@@ -441,6 +456,23 @@ public class FilmRepository {
         return count != null && count > 0;
     }
 
+    public List<Film> searchByTitle(String query) { // добавил для задания по поиску
+        String searchPattern = "%" + query.toLowerCase() + "%";
+
+        String searchQuery = FIND_ALL_QUERY +
+                " WHERE LOWER(f.name) LIKE ? " +
+                " ORDER BY (SELECT COUNT(*) FROM likes l WHERE l.film_id = f.film_id) DESC";
+
+        List<Film> films = jdbcTemplate.query(searchQuery, filmRowMapper, searchPattern);
+
+        if (!films.isEmpty()) {
+            loadGenresForFilms(films);
+        }
+
+        return films;
+    }
+
+
     public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
         if (sortRule == null) {
             throw new NotFoundException("Параметр для сортировки не задан.");
@@ -506,4 +538,6 @@ public class FilmRepository {
         }
         return films;
     }
+
+
 }
