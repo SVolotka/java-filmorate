@@ -148,4 +148,7 @@ public class FilmService {
                 .sorted(Comparator.comparingLong(Film::getRate).reversed())
                 .collect(Collectors.toList());
     }
+
+
+
 }
