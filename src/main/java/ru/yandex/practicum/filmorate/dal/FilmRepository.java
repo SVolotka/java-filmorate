@@ -469,6 +469,10 @@ public class FilmRepository {
             loadGenresForFilms(films);
         }
 
+        return films;
+    }
+
+
     public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
         if (sortRule == null) {
             throw new NotFoundException("Параметр для сортировки не задан.");
