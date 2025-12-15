@@ -15,6 +15,8 @@ import ru.yandex.practicum.filmorate.model.Film;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
+import java.util.Comparator;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -68,8 +70,26 @@ public class FilmService {
         filmRepository.removeLike(filmId, userId);
     }
 
-    public List<Film> getPopular(int count) {
-        return filmRepository.getPopularFilms(count);
+    public List<Film> getPopular(Integer count, Integer genreId, Integer year) {  // заменил метод Сергея
+        // Валидация count если указан
+        if (count != null && count <= 0) {
+            throw new ValidationException("Параметр 'count' должен быть положительным числом");
+        }
+
+        if (genreId != null) {
+            if (genreRepository.findById(genreId).isEmpty()) {
+                throw new NotFoundException("Жанр с id=" + genreId + " не найден");
+            }
+        }
+
+        if (year != null) {
+            if (year < 1895 || year > LocalDate.now().getYear() + 1) {
+                throw new ValidationException("Год должен быть между 1895 и " + (LocalDate.now().getYear() + 1));
+            }
+        }
+
+        // Передаем null в репозиторий, если count не указан
+        return filmRepository.getPopularFilms(count, genreId, year);
     }
 
     public List<Film> getCommonFilms(long userId, long friendId) {
@@ -107,7 +127,36 @@ public class FilmService {
         }
     }
 
+    public List<Film> searchFilms(String query, String by) {
+        if (query == null || query.isBlank()) {
+            throw new ValidationException("Параметр поиска 'query' не может быть пустым");
+        }
+
+        // Нижний регистр
+        String searchQuery = query.trim().toLowerCase();
+        String[] searchParams = by.toLowerCase().split(",");
+
+        List<Film> films;
+
+        // Пока реализуем только поиск по названию, без режиссера
+        if (by.contains("director")) {
+            // Когда появится сущность Director, реализовать поиск
+            films = filmRepository.searchByTitle(searchQuery);
+        } else {
+            // Поиск только по названию
+            films = filmRepository.searchByTitle(searchQuery);
+        }
+
+        // Сортируем по популярности (количеству лайков)
+        return films.stream()
+                .sorted(Comparator.comparingLong(Film::getRate).reversed())
+                .collect(Collectors.toList());
+    }
+
     public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
         return filmRepository.getAllFilmsByDirectorAndSortedBy(directorId, sortRule);
     }
+
+
+
 }
