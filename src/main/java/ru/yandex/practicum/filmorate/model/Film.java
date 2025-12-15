@@ -1,7 +1,6 @@
 package ru.yandex.practicum.filmorate.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -11,16 +10,12 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class Film {
     private Long id;
     @NotBlank(message = "Название фильма не может быть null или пустым")
@@ -37,8 +32,10 @@ public class Film {
 
     private Set<Genre> genres = new LinkedHashSet<>();
 
+    private List<Director> directors = new ArrayList<>();
+
     @JsonIgnore
-   private Set<Long> userIds = new HashSet<>();
+    private Set<Long> userIds = new HashSet<>();
 
     @JsonIgnore
     private Long rate = 0L;

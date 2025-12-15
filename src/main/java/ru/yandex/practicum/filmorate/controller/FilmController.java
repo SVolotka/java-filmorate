@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.controller;
 
 import jakarta.validation.Valid;
 import jakarta.validation.ValidationException;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -32,6 +33,17 @@ public class FilmController {
         List<Film> allFilms = filmService.findAll();
         log.info("Успешно обработан HTTP-запрос на получение всех фильмов");
         return allFilms;
+    }
+
+    @GetMapping("/director/{directorId}")
+    public Collection<Film> getAllFilmsByDirectorAndSortedBy(
+            @PathVariable("directorId") @NotNull(message = "id режиссера должно быть указано") Long directorId,
+            @RequestParam("sortBy") String sortRule
+    ) {
+        log.info("Получен HTTP-запрос на получение списка фильмов режиссера с id: {}", directorId);
+        List<Film> allFilmsByDirector = filmService.getAllFilmsByDirectorAndSortedBy(directorId, sortRule);
+        log.info("Успешно обработан HTTP-запрос на получение списка фильмов режиссера с id: {}", directorId);
+        return allFilmsByDirector;
     }
 
     @PostMapping
@@ -120,4 +132,12 @@ public class FilmController {
         }
         return true;
     }
+    @GetMapping("/common")
+    public List<Film> getCommonFilms(
+            @RequestParam long userId,
+            @RequestParam long friendId) {
+        log.info("GET /films/common: userId={}, friendId={}", userId, friendId);
+        return filmService.getCommonFilms(userId, friendId);
+    }
+
 }
