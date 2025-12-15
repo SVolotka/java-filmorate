@@ -72,6 +72,10 @@ public class FilmService {
         return filmRepository.getPopularFilms(count);
     }
 
+    public List<Film> getCommonFilms(long userId, long friendId) {
+        return filmRepository.getCommonFilms(userId, friendId);
+    }
+
     private void validate(Film film) {
         if (film.getName() == null || film.getName().isBlank()) {
             throw new ValidationException("Название фильма не может быть пустым");
@@ -101,5 +105,9 @@ public class FilmService {
         if (!invalid.isEmpty()) {
             throw new NotFoundException("Жанры не найдены: " + invalid);
         }
+    }
+
+    public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
+        return filmRepository.getAllFilmsByDirectorAndSortedBy(directorId, sortRule);
     }
 }
