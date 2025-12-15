@@ -92,6 +92,10 @@ public class FilmService {
         return filmRepository.getPopularFilms(count, genreId, year);
     }
 
+    public List<Film> getCommonFilms(long userId, long friendId) {
+        return filmRepository.getCommonFilms(userId, friendId);
+    }
+
     private void validate(Film film) {
         if (film.getName() == null || film.getName().isBlank()) {
             throw new ValidationException("Название фильма не может быть пустым");
@@ -147,6 +151,8 @@ public class FilmService {
         return films.stream()
                 .sorted(Comparator.comparingLong(Film::getRate).reversed())
                 .collect(Collectors.toList());
+    public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
+        return filmRepository.getAllFilmsByDirectorAndSortedBy(directorId, sortRule);
     }
 
 
