@@ -129,57 +129,6 @@ public class FilmService {
         }
     }
 
-    public List<Film> searchFilms(String query, String by) {
-        if (query == null || query.trim().isEmpty()) {
-            throw new ValidationException("Параметр поиска 'query' не может быть пустым");
-        }
-
-        String trimmedQuery = query.trim();
-        String lowerBy = by.toLowerCase();
-
-        List<Film> films;
-
-        try {
-            if (lowerBy.contains("director") && lowerBy.contains("title")) {
-                films = filmRepository.searchByTitleAndDirector(trimmedQuery);
-            } else if (lowerBy.contains("director")) {
-                films = filmRepository.searchByDirector(trimmedQuery);
-            } else {
-                films = filmRepository.searchByTitle(trimmedQuery);
-            }
-
-            // Если films null, возвращаем пустой список
-            if (films == null) {
-                return new ArrayList<>();
-            }
-
-            // Сортируем по лайкам
-            return films.stream()
-                    .filter(Objects::nonNull)
-                    .sorted(Comparator.comparingLong(Film::getRate).reversed())
-                    .collect(Collectors.toList());
-
-        } catch (Exception e) {
-            log.error("Error in searchFilms: {}", e.getMessage(), e);
-            // Возвращаем пустой список вместо ошибки
-            return new ArrayList<>();
-        }
-    }
-
-    private boolean isValidSearchParameter(String by) {
-        if (by == null || by.isBlank()) {
-            return false;
-        }
-
-        String[] params = by.toLowerCase().split(",");
-        for (String param : params) {
-            String trimmed = param.trim();
-            if (!trimmed.equals("title") && !trimmed.equals("director")) {
-                return false;
-            }
-        }
-        return true;
-    }
 
     public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
         return filmRepository.getAllFilmsByDirectorAndSortedBy(directorId, sortRule);

@@ -98,47 +98,6 @@ public class FilmController {
         return popularFilms;
     }
 
-    @GetMapping("/search")
-    public List<Film> searchFilms(
-            @RequestParam String query,
-            @RequestParam(required = false, defaultValue = "title") String by) {
-
-        log.info("Поиск фильмов: query='{}', by='{}'", query, by);
-
-        try {
-            // ПРОСТАЯ валидация
-            String lowerBy = by.toLowerCase().trim();
-            if (!lowerBy.equals("title") && !lowerBy.equals("director") &&
-                    !lowerBy.equals("director,title") && !lowerBy.equals("title,director")) {
-                log.warn("Неверный параметр by: {}, используем значение по умолчанию 'title'", by);
-                lowerBy = "title";
-            }
-
-            List<Film> foundFilms = filmService.searchFilms(query, lowerBy);
-            log.info("Найдено фильмов: {}", foundFilms.size());
-
-            return foundFilms;
-        } catch (Exception e) {
-            log.error("Ошибка при поиске: ", e);
-            throw e;
-        }
-    }
-
-    private boolean isValidSearchParameter(String by) {
-        if (by == null || by.isBlank()) {
-            return false;
-        }
-
-        // Разделяем по запятой и проверяем каждый параметр
-        String[] params = by.split(",");
-        for (String param : params) {
-            String trimmed = param.trim().toLowerCase();
-            if (!trimmed.equals("title") && !trimmed.equals("director")) {
-                return false;
-            }
-        }
-        return true;
-    }
 
     @GetMapping("/common")
     public List<Film> getCommonFilms(
