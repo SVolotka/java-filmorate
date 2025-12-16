@@ -513,7 +513,6 @@ public class FilmRepository {
         }
     }
 
-
     private List<Film> loadGenresAndDirectors(String sql, Long directorId) {
         List<Film> films = jdbcTemplate.query(sql, filmRowMapper, directorId);
         for (Film film : films) {
@@ -523,6 +522,131 @@ public class FilmRepository {
         }
         return films;
     }
+
+    public List<Film> searchFilms(String query, String[] searchFields) {
+        String searchPattern = "%" + query + "%";
+
+        // Определяем, какие поля искать
+        boolean searchByTitle = false;
+        boolean searchByDirector = false;
+
+        for (String field : searchFields) {
+            String trimmedField = field.trim().toLowerCase();
+            if (trimmedField.equals("title")) {
+                searchByTitle = true;
+            }
+            if (trimmedField.equals("director")) {
+                searchByDirector = true;
+            }
+        }
+
+        List<Film> films;
+
+        if (searchByTitle && searchByDirector) {
+            // Поиск и по названию, и по режиссеру
+            films = jdbcTemplate.query(SEARCH_BY_TITLE_AND_DIRECTOR_QUERY, filmRowMapper,
+                    searchPattern, searchPattern);
+        } else if (searchByTitle) {
+            // Поиск только по названию
+            films = jdbcTemplate.query(SEARCH_BY_TITLE_QUERY, filmRowMapper, searchPattern);
+        } else if (searchByDirector) {
+            // Поиск только по режиссеру
+            films = jdbcTemplate.query(SEARCH_BY_DIRECTOR_QUERY, filmRowMapper, searchPattern);
+        } else {
+            // Если передали невалидный параметр (но это уже проверено в сервисе)
+            films = Collections.emptyList();
+        }
+
+        if (!films.isEmpty()) {
+            loadGenresForFilms(films);
+            for (Film film : films) {
+                loadLikesForFilm(film);
+                film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
+            }
+        }
+
+        return films;
+    }
+
+    private static final String SEARCH_BY_TITLE_QUERY = """
+            SELECT DISTINCT
+                f.film_id,
+                f.name,
+                f.description,
+                f.release_date,
+                f.duration,
+                f.mpa_id,
+                m.name as mpa_name,
+                COUNT(l.like_id) as likes_count
+            FROM films f
+            LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+            LEFT JOIN likes l ON f.film_id = l.film_id
+            WHERE LOWER(f.name) LIKE LOWER(?)
+            GROUP BY 
+                f.film_id,
+                f.name,
+                f.description,
+                f.release_date,
+                f.duration,
+                f.mpa_id,
+                m.name
+            ORDER BY likes_count DESC
+            """;
+
+    private static final String SEARCH_BY_DIRECTOR_QUERY = """
+            SELECT DISTINCT
+                f.film_id,
+                f.name,
+                f.description,
+                f.release_date,
+                f.duration,
+                f.mpa_id,
+                m.name as mpa_name,
+                COUNT(l.like_id) as likes_count
+            FROM films f
+            LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+            LEFT JOIN likes l ON f.film_id = l.film_id
+            INNER JOIN directors_films df ON f.film_id = df.film_id
+            INNER JOIN directors d ON df.director_id = d.id
+            WHERE LOWER(d.name) LIKE LOWER(?)
+            GROUP BY 
+                f.film_id,
+                f.name,
+                f.description,
+                f.release_date,
+                f.duration,
+                f.mpa_id,
+                m.name
+            ORDER BY likes_count DESC
+            """;
+
+    private static final String SEARCH_BY_TITLE_AND_DIRECTOR_QUERY = """
+            SELECT DISTINCT
+                f.film_id,
+                f.name,
+                f.description,
+                f.release_date,
+                f.duration,
+                f.mpa_id,
+                m.name as mpa_name,
+                COUNT(l.like_id) as likes_count
+            FROM films f
+            LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+            LEFT JOIN likes l ON f.film_id = l.film_id
+            LEFT JOIN directors_films df ON f.film_id = df.film_id
+            LEFT JOIN directors d ON df.director_id = d.id
+            WHERE LOWER(f.name) LIKE LOWER(?) 
+               OR LOWER(d.name) LIKE LOWER(?)
+            GROUP BY 
+                f.film_id,
+                f.name,
+                f.description,
+                f.release_date,
+                f.duration,
+                f.mpa_id,
+                m.name
+            ORDER BY likes_count DESC
+            """;
 
 
 }

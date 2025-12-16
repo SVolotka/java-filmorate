@@ -129,9 +129,25 @@ public class FilmService {
         }
     }
 
-
     public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
         return filmRepository.getAllFilmsByDirectorAndSortedBy(directorId, sortRule);
+    }
+
+    public List<Film> searchFilms(String query, String by) {
+        if (query == null || query.trim().isEmpty()) {
+            throw new ValidationException("Параметр query не может быть пустым");
+        }
+
+        // Валидация параметра by
+        String[] searchFields = by.split(",");
+        for (String field : searchFields) {
+            String trimmedField = field.trim().toLowerCase();
+            if (!trimmedField.equals("title") && !trimmedField.equals("director")) {
+                throw new ValidationException("Параметр by может содержать только 'title' и/или 'director'");
+            }
+        }
+
+        return filmRepository.searchFilms(query.trim(), searchFields);
     }
 
 
