@@ -16,6 +16,7 @@ import ru.yandex.practicum.filmorate.model.Film;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -135,29 +136,37 @@ public class FilmService {
 
         String trimmedQuery = query.trim();
 
-        // Валидация параметра by
-        if (!isValidSearchParameter(by)) {
-            throw new ValidationException("Параметр 'by' должен быть 'title', 'director' или 'director,title'");
+        // ПРОСТАЯ валидация - принимаем "title", "director", "director,title"
+        if (by == null || by.isBlank()) {
+            by = "title";  // значение по умолчанию
         }
 
-        try {
-            List<Film> films;
-
-            if (by.contains("director") && by.contains("title")) {
-                films = filmRepository.searchByTitleAndDirector(trimmedQuery);
-            } else if (by.contains("director")) {
-                films = filmRepository.searchByDirector(trimmedQuery);
-            } else {
-                films = filmRepository.searchByTitle(trimmedQuery);
-            }
-
-            // Простая сортировка - вернем как есть
-            return films;
-
-        } catch (Exception e) {
-            // Возвращаем пустой список вместо ошибки
-            return new ArrayList<>();
+        // Просто проверяем, что параметр не содержит запрещенных значений
+        String lowerBy = by.toLowerCase();
+        if (!lowerBy.contains("title") && !lowerBy.contains("director")) {
+            throw new ValidationException("Параметр 'by' должен содержать 'title' или 'director'");
         }
+
+        List<Film> films;
+
+        if (lowerBy.contains("director") && lowerBy.contains("title")) {
+            films = filmRepository.searchByTitleAndDirector(trimmedQuery);
+        } else if (lowerBy.contains("director")) {
+            films = filmRepository.searchByDirector(trimmedQuery);
+        } else {
+            films = filmRepository.searchByTitle(trimmedQuery);
+        }
+
+        // Убедитесь, что загружаем данные
+        if (films != null && !films.isEmpty()) {
+            // Жанры и режиссеры должны загружаться в методах репозитория
+        }
+
+        // Сортируем по лайкам
+        return films.stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparingLong(Film::getRate).reversed())
+                .collect(Collectors.toList());
     }
 
     private boolean isValidSearchParameter(String by) {
