@@ -526,9 +526,9 @@ public class FilmRepository {
             SELECT DISTINCT f.*, m.name as mpa_name
             FROM films f
             LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
-            WHERE LOWER(f.name) LIKE ? 
+            WHERE LOWER(f.name) LIKE ?
                OR f.film_id IN (
-                   SELECT df.film_id 
+                   SELECT df.film_id
                    FROM directors_films df
                    JOIN directors d ON df.director_id = d.id
                    WHERE LOWER(d.name) LIKE ?
@@ -588,8 +588,8 @@ public class FilmRepository {
                 FROM films f
                 LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
                 WHERE f.film_id IN (
-                    SELECT df.film_id 
-                    FROM directors_films df 
+                    SELECT df.film_id
+                    FROM directors_films df
                     WHERE df.director_id = ?
                 )
                 ORDER BY f.release_date ASC
@@ -598,17 +598,17 @@ public class FilmRepository {
 
             case "likes":
                 sql = """
-                SELECT f.*, m.name as mpa_name, 
+                SELECT f.*, m.name as mpa_name,
                        COUNT(l.like_id) as likes_count
                 FROM films f
                 LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
                 LEFT JOIN likes l ON f.film_id = l.film_id
                 WHERE f.film_id IN (
-                    SELECT df.film_id 
-                    FROM directors_films df 
+                    SELECT df.film_id
+                    FROM directors_films df
                     WHERE df.director_id = ?
                 )
-                GROUP BY f.film_id, f.name, f.description, 
+                GROUP BY f.film_id, f.name, f.description,
                          f.release_date, f.duration, f.mpa_id, m.name
                 ORDER BY likes_count DESC, f.film_id ASC
                 """;
