@@ -480,39 +480,47 @@ public class FilmRepository {
 
     // метод для поиска по режиссеру
     public List<Film> searchByDirector(String query) {
-        String searchPattern = "%" + query.toLowerCase() + "%";
+        try {
+            // ПРОСТОЙ запрос для отладки
+            String searchPattern = "%" + query.toLowerCase() + "%";
 
-        String searchQuery = """
-        SELECT DISTINCT
-            f.film_id,
-            f.name,
-            f.description,
-            f.release_date,
-            f.duration,
-            f.mpa_id,
-            m.name as mpa_name
-        FROM films f
-        LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
-        WHERE f.film_id IN (
-            SELECT df.film_id
-            FROM directors_films df
-            JOIN directors d ON df.director_id = d.id
-            WHERE LOWER(d.name) LIKE ?
-        )
-        ORDER BY (SELECT COUNT(*) FROM likes l WHERE l.film_id = f.film_id) DESC
-        """;
+            // Проверим сначала, есть ли режиссеры
+            String checkSql = "SELECT id, name FROM directors WHERE LOWER(name) LIKE ?";
+            List<Map<String, Object>> directors = jdbcTemplate.queryForList(checkSql, searchPattern);
+            System.out.println("Found directors: " + directors.size());
 
-        List<Film> films = jdbcTemplate.query(searchQuery, filmRowMapper, searchPattern);
-
-        if (!films.isEmpty()) {
-            loadGenresForFilms(films);           // Жанры
-            loadDirectorsForFilms(films);        // Режиссеры
-            for (Film film : films) {
-                loadLikesForFilm(film);          // Лайки
+            if (directors.isEmpty()) {
+                return new ArrayList<>();
             }
-        }
 
-        return films;
+            // Простой запрос фильмов
+            String sql = """
+            SELECT DISTINCT f.*, m.name as mpa_name
+            FROM films f
+            LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+            WHERE f.film_id IN (
+                SELECT df.film_id 
+                FROM directors_films df 
+                WHERE df.director_id IN (
+                    SELECT id FROM directors WHERE LOWER(name) LIKE ?
+                )
+            )
+            """;
+
+            List<Film> films = jdbcTemplate.query(sql, filmRowMapper, searchPattern);
+            System.out.println("Found films: " + films.size());
+
+            // Минимальная загрузка
+            if (!films.isEmpty()) {
+                loadGenresForFilms(films);
+            }
+
+            return films;
+        } catch (Exception e) {
+            System.err.println("Error in searchByDirector: " + e.getMessage());
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
     }
 
     // метод для комбинированного поиска

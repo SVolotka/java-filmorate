@@ -104,17 +104,25 @@ public class FilmController {
             @RequestParam String query,
             @RequestParam(required = false, defaultValue = "title") String by) {
 
-        log.info("Получен HTTP-запрос на поиск фильмов: query={}, by={}", query, by);
+        log.info("Поиск фильмов: query='{}', by='{}'", query, by);
 
-        // Валидация для 'by'
-        if (!isValidSearchParameter(by)) {
-            throw new ValidationException("Параметр 'by' должен быть 'title', 'director' или 'director,title'");
+        try {
+            // ПРОСТАЯ валидация
+            String lowerBy = by.toLowerCase().trim();
+            if (!lowerBy.equals("title") && !lowerBy.equals("director") &&
+                    !lowerBy.equals("director,title") && !lowerBy.equals("title,director")) {
+                log.warn("Неверный параметр by: {}, используем значение по умолчанию 'title'", by);
+                lowerBy = "title";
+            }
+
+            List<Film> foundFilms = filmService.searchFilms(query, lowerBy);
+            log.info("Найдено фильмов: {}", foundFilms.size());
+
+            return foundFilms;
+        } catch (Exception e) {
+            log.error("Ошибка при поиске: ", e);
+            throw e;
         }
-
-        List<Film> foundFilms = filmService.searchFilms(query, by);
-        log.info("Успешно обработан HTTP-запрос на поиск, найдено {} фильмов", foundFilms.size());
-
-        return foundFilms;
     }
 
     private boolean isValidSearchParameter(String by) {

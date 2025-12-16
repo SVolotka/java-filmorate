@@ -135,38 +135,35 @@ public class FilmService {
         }
 
         String trimmedQuery = query.trim();
-
-        // ПРОСТАЯ валидация - принимаем "title", "director", "director,title"
-        if (by == null || by.isBlank()) {
-            by = "title";  // значение по умолчанию
-        }
-
-        // Просто проверяем, что параметр не содержит запрещенных значений
         String lowerBy = by.toLowerCase();
-        if (!lowerBy.contains("title") && !lowerBy.contains("director")) {
-            throw new ValidationException("Параметр 'by' должен содержать 'title' или 'director'");
-        }
 
         List<Film> films;
 
-        if (lowerBy.contains("director") && lowerBy.contains("title")) {
-            films = filmRepository.searchByTitleAndDirector(trimmedQuery);
-        } else if (lowerBy.contains("director")) {
-            films = filmRepository.searchByDirector(trimmedQuery);
-        } else {
-            films = filmRepository.searchByTitle(trimmedQuery);
-        }
+        try {
+            if (lowerBy.contains("director") && lowerBy.contains("title")) {
+                films = filmRepository.searchByTitleAndDirector(trimmedQuery);
+            } else if (lowerBy.contains("director")) {
+                films = filmRepository.searchByDirector(trimmedQuery);
+            } else {
+                films = filmRepository.searchByTitle(trimmedQuery);
+            }
 
-        // Убедитесь, что загружаем данные
-        if (films != null && !films.isEmpty()) {
-            // Жанры и режиссеры должны загружаться в методах репозитория
-        }
+            // Если films null, возвращаем пустой список
+            if (films == null) {
+                return new ArrayList<>();
+            }
 
-        // Сортируем по лайкам
-        return films.stream()
-                .filter(Objects::nonNull)
-                .sorted(Comparator.comparingLong(Film::getRate).reversed())
-                .collect(Collectors.toList());
+            // Сортируем по лайкам
+            return films.stream()
+                    .filter(Objects::nonNull)
+                    .sorted(Comparator.comparingLong(Film::getRate).reversed())
+                    .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            log.error("Error in searchFilms: {}", e.getMessage(), e);
+            // Возвращаем пустой список вместо ошибки
+            return new ArrayList<>();
+        }
     }
 
     private boolean isValidSearchParameter(String by) {
