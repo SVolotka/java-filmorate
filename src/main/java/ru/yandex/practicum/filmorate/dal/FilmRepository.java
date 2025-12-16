@@ -499,8 +499,8 @@ public class FilmRepository {
             FROM films f
             LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
             WHERE f.film_id IN (
-                SELECT df.film_id 
-                FROM directors_films df 
+                SELECT df.film_id
+                FROM directors_films df
                 WHERE df.director_id IN (
                     SELECT id FROM directors WHERE LOWER(name) LIKE ?
                 )
