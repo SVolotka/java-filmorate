@@ -117,6 +117,19 @@ public class FilmController {
         return foundFilms;
     }
 
+    @GetMapping("/common")
+    public List<Film> getCommonFilms(
+            @RequestParam long userId,
+            @RequestParam long friendId) {
+        log.info("GET /films/common: userId={}, friendId={}", userId, friendId);
+        return filmService.getCommonFilms(userId, friendId);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteFilmById(@PathVariable("id") long id) {
+        filmService.deleteFilmById(id);
+    }
+
     private boolean isValidSearchParameter(String by) {
         if (by == null || by.isBlank()) {
             return false;
@@ -131,14 +144,6 @@ public class FilmController {
             }
         }
         return true;
-    }
-
-    @GetMapping("/common")
-    public List<Film> getCommonFilms(
-            @RequestParam long userId,
-            @RequestParam long friendId) {
-        log.info("GET /films/common: userId={}, friendId={}", userId, friendId);
-        return filmService.getCommonFilms(userId, friendId);
     }
 
 }

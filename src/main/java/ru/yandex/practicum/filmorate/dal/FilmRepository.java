@@ -100,6 +100,7 @@ public class FilmRepository {
 
     private static final String DELETE_GENRES_BY_FILM_ID = "DELETE FROM film_genre WHERE film_id = ?";
     private static final String INSERT_FILM_GENRE = "INSERT INTO film_genre (film_id, genre_id) VALUES (?, ?)";
+    private static final String DELETE_FILM_BY_ID_QUERY = "DELETE FROM films WHERE film_id = ?";
 
     private final JdbcTemplate jdbcTemplate;
     private final FilmRowMapper filmRowMapper;
@@ -430,26 +431,6 @@ public class FilmRepository {
         return films;
     }
 
-    private void loadLikesForFilm(Film film) {
-        if (film == null || film.getId() == null) {
-            return;
-        }
-
-        Long count = jdbcTemplate.queryForObject(
-                GET_LIKES_COUNT_QUERY,
-                Long.class,
-                film.getId()
-        );
-        film.setRate(count != null ? count : 0L);
-
-        List<Long> userIds = jdbcTemplate.queryForList(
-                GET_LIKED_USERS_QUERY,
-                Long.class,
-                film.getId()
-        );
-        film.setUserIds(new HashSet<>(userIds));
-    }
-
     public boolean exists(long id) {
         String sql = "SELECT COUNT(*) FROM films WHERE film_id = ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
@@ -529,6 +510,33 @@ public class FilmRepository {
         }
     }
 
+    public void deleteFilmById(long filmId) {
+        int rowsAffected = jdbcTemplate.update(DELETE_FILM_BY_ID_QUERY, filmId);
+        if (rowsAffected == 0) {
+            throw new NotFoundException(String.format("Фильм с id: %s не найден", filmId));
+        }
+    }
+
+    private void loadLikesForFilm(Film film) {
+        if (film == null || film.getId() == null) {
+            return;
+        }
+
+        Long count = jdbcTemplate.queryForObject(
+                GET_LIKES_COUNT_QUERY,
+                Long.class,
+                film.getId()
+        );
+        film.setRate(count != null ? count : 0L);
+
+        List<Long> userIds = jdbcTemplate.queryForList(
+                GET_LIKED_USERS_QUERY,
+                Long.class,
+                film.getId()
+        );
+        film.setUserIds(new HashSet<>(userIds));
+    }
+
     private List<Film> loadGenresAndDirectors(String sql, Long directorId) {
         List<Film> films = jdbcTemplate.query(sql, filmRowMapper, directorId);
         for (Film film : films) {
@@ -538,6 +546,4 @@ public class FilmRepository {
         }
         return films;
     }
-
-
 }
