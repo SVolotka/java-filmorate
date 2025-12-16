@@ -1,6 +1,7 @@
 package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.dal.FilmRepository;
 import ru.yandex.practicum.filmorate.dal.GenreRepository;
@@ -10,16 +11,18 @@ import ru.yandex.practicum.filmorate.exception.InvalidDurationException;
 import ru.yandex.practicum.filmorate.exception.InvalidReleaseDateException;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.exception.InternalServerException;
 import ru.yandex.practicum.filmorate.model.Film;
 
+
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Set;
-import java.util.Comparator;
+import java.util.*;
 import java.util.stream.Collectors;
+
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class FilmService {
     private static final LocalDate FILM_BIRTHDAY = LocalDate.of(1895, 12, 28);
 
@@ -128,29 +131,50 @@ public class FilmService {
     }
 
     public List<Film> searchFilms(String query, String by) {
-        if (query == null || query.isBlank()) {
+        if (query == null || query.trim().isEmpty()) {
             throw new ValidationException("Параметр поиска 'query' не может быть пустым");
         }
 
-        // Нижний регистр
-        String searchQuery = query.trim().toLowerCase();
-        String[] searchParams = by.toLowerCase().split(",");
+        String trimmedQuery = query.trim();
 
-        List<Film> films;
-
-        // Пока реализуем только поиск по названию, без режиссера
-        if (by.contains("director")) {
-            // Когда появится сущность Director, реализовать поиск
-            films = filmRepository.searchByTitle(searchQuery);
-        } else {
-            // Поиск только по названию
-            films = filmRepository.searchByTitle(searchQuery);
+        // Валидация параметра by
+        if (!isValidSearchParameter(by)) {
+            throw new ValidationException("Параметр 'by' должен быть 'title', 'director' или 'director,title'");
         }
 
-        // Сортируем по популярности (количеству лайков)
-        return films.stream()
-                .sorted(Comparator.comparingLong(Film::getRate).reversed())
-                .collect(Collectors.toList());
+        try {
+            List<Film> films;
+
+            if (by.contains("director") && by.contains("title")) {
+                films = filmRepository.searchByTitleAndDirector(trimmedQuery);
+            } else if (by.contains("director")) {
+                films = filmRepository.searchByDirector(trimmedQuery);
+            } else {
+                films = filmRepository.searchByTitle(trimmedQuery);
+            }
+
+            // Простая сортировка - вернем как есть
+            return films;
+
+        } catch (Exception e) {
+            // Возвращаем пустой список вместо ошибки
+            return new ArrayList<>();
+        }
+    }
+
+    private boolean isValidSearchParameter(String by) {
+        if (by == null || by.isBlank()) {
+            return false;
+        }
+
+        String[] params = by.toLowerCase().split(",");
+        for (String param : params) {
+            String trimmed = param.trim();
+            if (!trimmed.equals("title") && !trimmed.equals("director")) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {

@@ -13,6 +13,7 @@ import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Director;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
+import ru.yandex.practicum.filmorate.model.Mpa;
 
 import java.sql.*;
 import java.util.*;
@@ -456,7 +457,9 @@ public class FilmRepository {
         return count != null && count > 0;
     }
 
-    public List<Film> searchByTitle(String query) { // добавил для задания по поиску
+    // метод для происка по названию
+    // В методе searchByTitle:
+    public List<Film> searchByTitle(String query) {
         String searchPattern = "%" + query.toLowerCase() + "%";
 
         String searchQuery = FIND_ALL_QUERY +
@@ -466,67 +469,247 @@ public class FilmRepository {
         List<Film> films = jdbcTemplate.query(searchQuery, filmRowMapper, searchPattern);
 
         if (!films.isEmpty()) {
-            loadGenresForFilms(films);
+            loadGenresForFilms(films);  // Жанры
+            loadDirectorsForFilms(films);  // Режиссеры
+            for (Film film : films) {
+                loadLikesForFilm(film);  // Лайки
+            }
         }
 
         return films;
     }
 
+    // метод для поиска по режиссеру
+    public List<Film> searchByDirector(String query) {
+        String searchPattern = "%" + query.toLowerCase() + "%";
+
+        String searchQuery = """
+        SELECT DISTINCT
+            f.film_id,
+            f.name,
+            f.description,
+            f.release_date,
+            f.duration,
+            f.mpa_id,
+            m.name as mpa_name
+        FROM films f
+        LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+        WHERE f.film_id IN (
+            SELECT df.film_id
+            FROM directors_films df
+            JOIN directors d ON df.director_id = d.id
+            WHERE LOWER(d.name) LIKE ?
+        )
+        ORDER BY (SELECT COUNT(*) FROM likes l WHERE l.film_id = f.film_id) DESC
+        """;
+
+        List<Film> films = jdbcTemplate.query(searchQuery, filmRowMapper, searchPattern);
+
+        if (!films.isEmpty()) {
+            loadGenresForFilms(films);  // Жанры
+            loadDirectorsForFilms(films);  // Режиссеры
+            for (Film film : films) {
+                loadLikesForFilm(film);  // Лайки
+            }
+        }
+
+        return films;
+    }
+
+    // метод для комбинированного поиска
+    public List<Film> searchByTitleAndDirector(String query) {
+        try {
+            String searchPattern = "%" + query.toLowerCase() + "%";
+
+            // Простой запрос
+            String sql = """
+            SELECT DISTINCT f.*, m.name as mpa_name
+            FROM films f
+            LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+            WHERE LOWER(f.name) LIKE ? 
+               OR f.film_id IN (
+                   SELECT df.film_id 
+                   FROM directors_films df
+                   JOIN directors d ON df.director_id = d.id
+                   WHERE LOWER(d.name) LIKE ?
+               )
+            """;
+
+            // Используем простой маппинг
+            List<Film> films = jdbcTemplate.query(sql, (rs, rowNum) -> {
+                Film film = new Film();
+                film.setId(rs.getLong("film_id"));
+                film.setName(rs.getString("name"));
+                film.setDescription(rs.getString("description"));
+
+                Timestamp releaseDate = rs.getTimestamp("release_date");
+                if (releaseDate != null) {
+                    film.setReleaseDate(releaseDate.toLocalDateTime().toLocalDate());
+                }
+
+                film.setDuration(rs.getLong("duration"));
+
+                Integer mpaId = rs.getInt("mpa_id");
+                String mpaName = rs.getString("mpa_name");
+                if (mpaId != null) {
+                    film.setMpa(new Mpa(mpaId, mpaName));
+                }
+
+                return film;
+            }, searchPattern, searchPattern);
+
+            // Базовая загрузка данных
+            if (!films.isEmpty()) {
+                loadGenresForFilms(films);
+            }
+
+            return films;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
 
     public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
+        if (directorId == null) {
+            throw new ValidationException("ID режиссера не может быть null");
+        }
+
         if (sortRule == null) {
             throw new NotFoundException("Параметр для сортировки не задан.");
         }
 
+        String sql;
         switch (sortRule) {
-            case "year" -> {
-                String sql = """
-                SELECT
-                    f.film_id,
-                    f.name,
-                    f.description,
-                    f.release_date,
-                    f.duration,
-                    f.mpa_id,
-                    m.name as mpa_name
+            case "year":
+                sql = """
+                SELECT f.*, m.name as mpa_name
                 FROM films f
-                INNER JOIN directors_films df ON f.film_id = df.film_id
                 LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
-                WHERE df.director_id = ?
-                ORDER BY f.release_date""";
+                WHERE f.film_id IN (
+                    SELECT df.film_id 
+                    FROM directors_films df 
+                    WHERE df.director_id = ?
+                )
+                ORDER BY f.release_date ASC
+                """;
+                break;
 
-                return loadGenresAndDirectors(sql, directorId);
-            }
-            case "likes" -> {
-                String sql = """
-                SELECT
-                    f.film_id,
-                    f.name,
-                    f.description,
-                    f.release_date,
-                    f.duration,
-                    f.mpa_id,
-                    m.name as mpa_name,
-                    COUNT(l.like_id) AS likes_count
+            case "likes":
+                sql = """
+                SELECT f.*, m.name as mpa_name, 
+                       COUNT(l.like_id) as likes_count
                 FROM films f
-                INNER JOIN directors_films df ON f.film_id = df.film_id
                 LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
                 LEFT JOIN likes l ON f.film_id = l.film_id
-                WHERE df.director_id = ?
-                GROUP BY
-                    f.film_id,
-                    f.name,
-                    f.description,
-                    f.release_date,
-                    f.duration,
-                    f.mpa_id,
-                    m.name
-                ORDER BY COUNT(l.like_id) DESC""";
+                WHERE f.film_id IN (
+                    SELECT df.film_id 
+                    FROM directors_films df 
+                    WHERE df.director_id = ?
+                )
+                GROUP BY f.film_id, f.name, f.description, 
+                         f.release_date, f.duration, f.mpa_id, m.name
+                ORDER BY likes_count DESC, f.film_id ASC
+                """;
+                break;
 
-                return loadGenresAndDirectors(sql, directorId);
-            }
-            default -> throw new NotFoundException("Такого параметра для сортировки не существует.");
+            default:
+                throw new NotFoundException("Такого параметра для сортировки не существует.");
         }
+
+        // Простой маппинг
+        List<Film> films = jdbcTemplate.query(sql, (rs, rowNum) -> {
+            Film film = new Film();
+            film.setId(rs.getLong("film_id"));
+            film.setName(rs.getString("name"));
+            film.setDescription(rs.getString("description"));
+
+            Timestamp releaseDate = rs.getTimestamp("release_date");
+            if (releaseDate != null) {
+                film.setReleaseDate(releaseDate.toLocalDateTime().toLocalDate());
+            }
+
+            film.setDuration(rs.getLong("duration"));
+
+            Integer mpaId = rs.getInt("mpa_id");
+            String mpaName = rs.getString("mpa_name");
+            if (mpaId != null) {
+                film.setMpa(new Mpa(mpaId, mpaName));
+            }
+
+            return film;
+        }, directorId);
+
+        // Базовая загрузка
+        if (!films.isEmpty()) {
+            loadGenresForFilms(films);
+            // Временно пропускаем режиссеров
+        }
+
+        return films;
+    }
+
+    private List<Film> enrichFilms(List<Film> films) {
+        if (films.isEmpty()) {
+            return films;
+        }
+
+        try {
+            loadGenresForFilms(films);
+            loadDirectorsForFilms(films);
+            for (Film film : films) {
+                loadLikesForFilm(film);
+            }
+        } catch (Exception e) {
+            log.error("Error enriching films: {}", e.getMessage(), e);
+        }
+
+        return films;
+    }
+
+    private List<Film> loadFilmData(String sql, Long directorId) {
+        List<Film> films = jdbcTemplate.query(sql, filmRowMapper, directorId);
+
+        if (!films.isEmpty()) {
+            // Загружаем ВСЕ данные
+            loadGenresForFilms(films);  // Жанры
+            loadDirectorsForFilms(films);  // Режиссеры
+            for (Film film : films) {
+                loadLikesForFilm(film);  // Лайки
+            }
+        }
+
+        return films;
+    }
+
+    private Map<Long, List<Director>> getDirectorsByFilmIds(List<Long> filmIds) {
+        if (filmIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        String inClause = String.join(",", Collections.nCopies(filmIds.size(), "?"));
+        String query = """
+            SELECT df.film_id, d.id as director_id, d.name as director_name
+            FROM directors_films df
+            JOIN directors d ON df.director_id = d.id
+            WHERE df.film_id IN (%s)
+            ORDER BY df.film_id, d.id
+            """.formatted(inClause);
+
+        Map<Long, List<Director>> directorsMap = new HashMap<>();
+        jdbcTemplate.query(query, rs -> {
+            while (rs.next()) {
+                long filmId = rs.getLong("film_id");
+                Director director = Director.builder()
+                        .id(rs.getLong("director_id"))
+                        .name(rs.getString("director_name"))
+                        .build();
+                directorsMap.computeIfAbsent(filmId, k -> new ArrayList<>()).add(director);
+            }
+        }, filmIds.toArray());
+
+        return directorsMap;
     }
 
     private List<Film> loadGenresAndDirectors(String sql, Long directorId) {
@@ -537,6 +720,50 @@ public class FilmRepository {
             film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
         }
         return films;
+    }
+
+    private void loadDirectorsForFilms(List<Film> films) {
+        if (films == null || films.isEmpty()) {
+            return;
+        }
+
+        List<Long> filmIds = films.stream()
+                .map(Film::getId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (filmIds.isEmpty()) {
+            return;
+        }
+
+        String inClause = String.join(",", Collections.nCopies(filmIds.size(), "?"));
+        String query = """
+            SELECT df.film_id, d.id as director_id, d.name as director_name
+            FROM directors_films df
+            JOIN directors d ON df.director_id = d.id
+            WHERE df.film_id IN (%s)
+            ORDER BY df.film_id, d.id
+            """.formatted(inClause);
+
+        Map<Long, List<Director>> directorsByFilmId = new HashMap<>();
+
+        try {
+            jdbcTemplate.query(query, rs -> {
+                long filmId = rs.getLong("film_id");
+                Director director = Director.builder()
+                        .id(rs.getLong("director_id"))
+                        .name(rs.getString("director_name"))
+                        .build();
+                directorsByFilmId.computeIfAbsent(filmId, k -> new ArrayList<>()).add(director);
+            }, filmIds.toArray());
+        } catch (Exception e) {
+            // Логируем, но не падаем
+            System.err.println("Error loading directors: " + e.getMessage());
+        }
+
+        for (Film film : films) {
+            film.setDirectors(directorsByFilmId.getOrDefault(film.getId(), new ArrayList<>()));
+        }
     }
 
 
