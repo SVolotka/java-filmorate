@@ -2,9 +2,11 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.dal.FilmRepository;
 import ru.yandex.practicum.filmorate.dal.UserRepository;
 import ru.yandex.practicum.filmorate.exception.UserNotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.User;
 
 import java.time.LocalDate;
@@ -15,6 +17,7 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final FilmRepository filmRepository;
 
     public User create(User user) {
         validateUser(user);
@@ -77,6 +80,13 @@ public class UserService {
             throw new UserNotFoundException("User with id=" + friendId + " not found");
         }
         return userRepository.getCommonFriends(userId, friendId);
+    }
+
+    public List<Film> getRecommendedFilms(long userId) {
+        if (!userRepository.exists(userId)) {
+            throw new UserNotFoundException("User with id=" + userId + " not found");
+        }
+        return filmRepository.getRecommendedFilms(userId);
     }
 
     private void checkAndSetName(User user) {

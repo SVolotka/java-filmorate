@@ -14,6 +14,7 @@ import ru.yandex.practicum.filmorate.dal.MpaRepository;
 import ru.yandex.practicum.filmorate.dal.mappers.FilmRowMapper;
 import ru.yandex.practicum.filmorate.dal.mappers.GenreRowMapper;
 import ru.yandex.practicum.filmorate.dal.mappers.MpaRowMapper;
+import ru.yandex.practicum.filmorate.dal.mappers.UserRowMapper;
 import ru.yandex.practicum.filmorate.model.Film;
 
 import java.util.List;
@@ -21,7 +22,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @JdbcTest
-@Import({FilmRepository.class, FilmRowMapper.class, GenreRowMapper.class, MpaRepository.class, GenreRepository.class, MpaRowMapper.class})
+@Import({FilmRepository.class, FilmRowMapper.class, GenreRowMapper.class, MpaRepository.class, GenreRepository.class, MpaRowMapper.class, UserRowMapper.class})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Sql({"/schema.sql", "/data.sql"})
 @Transactional

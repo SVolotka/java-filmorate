@@ -14,7 +14,7 @@ import ru.yandex.practicum.filmorate.model.User;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Timestamp;
-import java.util.List;
+import java.util.*;
 
 @Repository
 @RequiredArgsConstructor
