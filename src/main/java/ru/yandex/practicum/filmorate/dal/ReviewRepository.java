@@ -39,7 +39,7 @@ public class ReviewRepository {
         return reviews;
     }
 
-    public Review getById(int id) {
+    public Review getById(long id) {
         log.debug("Поиск отзыва по id: {}", id);
         try {
             Review review = jdbc.queryForObject(FIND_BY_ID_QUERY, reviewRowMapper, id);
@@ -68,8 +68,8 @@ public class ReviewRepository {
             PreparedStatement ps = con.prepareStatement(CREATE_QUERY, new String[]{"review_id"});
             ps.setString(1, review.getContent());
             ps.setBoolean(2, review.getIsPositive());
-            ps.setInt(3, review.getUserId());
-            ps.setInt(4, review.getFilmId());
+            ps.setLong(3, review.getUserId());
+            ps.setLong(4, review.getFilmId());
             ps.setInt(5, review.getUseful() != null ? review.getUseful() : 0);
             return ps;
         }, keyHolder);
@@ -83,13 +83,13 @@ public class ReviewRepository {
             throw new RuntimeException("Сгенерированный id не был возвращен");
         }
 
-        review.setReviewId(key.intValue());
+        review.setReviewId(key.longValue());
 
         log.debug("Отзыв добавлен с id: {}", key.intValue());
         return review;
     }
 
-    public void delete(int reviewId) {
+    public void delete(long reviewId) {
         log.info("Удаление отзыва с id: {}", reviewId);
         int deleteRows = jdbc.update(DELETE_QUERY, reviewId);
 
@@ -131,7 +131,7 @@ public class ReviewRepository {
         return updatedReview;
     }
 
-    public List<Review> findByFilmId(int filmId, int count) {
+    public List<Review> findByFilmId(long filmId, int count) {
         log.debug("Поиск отзывов для фильма с id: {} с лимитом {}", filmId, count);
 
         List<Review> reviews = jdbc.query(FIND_BY_FILM_ID_LIMIT_QUERY, reviewRowMapper, filmId, count);

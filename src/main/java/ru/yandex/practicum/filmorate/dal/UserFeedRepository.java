@@ -1,6 +1,7 @@
 package ru.yandex.practicum.filmorate.dal;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Repository;
@@ -14,16 +15,17 @@ import java.util.List;
 
 @Repository
 @RequiredArgsConstructor
+@Slf4j
 public class UserFeedRepository {
 
     private static final String INSERT_QUERY = """
-                    INSERT INTO user_events (user_id, event_type, operation, entity_id, timestamp)
+                    INSERT INTO user_events (user_id, event_type, operation, entity_id, event_timestamp)
                     VALUES (?, ?, ?, ?, ?)
                     """;
 
     private static final String GET_BY_USER_ID_QUERY = """
-            SELECT event_id, user_id, event_type, operation, entity_id, timestamp
-            FROM user_events WHERE user_id = ? ORDER BY timestamp DESC
+            SELECT event_id, user_id, event_type, operation, entity_id, event_timestamp
+            FROM user_events WHERE user_id = ? ORDER BY event_timestamp ASC
             """;
 
     private static final String DELETE_LIKE_EVENTS_BY_FILM_ID_QUERY =
@@ -40,6 +42,13 @@ public class UserFeedRepository {
 
     public UserFeed create(UserFeed userFeed) {
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
+
+        log.info("Создание события: userId={}, eventType={}, operation={}, entityId={}, timestamp={}",
+                userFeed.getUserId(),
+                userFeed.getEventType(),
+                userFeed.getOperation(),
+                userFeed.getEntityId(),
+                userFeed.getTimestamp());
 
         int rowsAffected = jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(INSERT_QUERY, Statement.RETURN_GENERATED_KEYS);
@@ -65,19 +74,19 @@ public class UserFeedRepository {
         return userFeed;
     }
 
-    public List<UserFeed> getByUserId(Long userId) {
-        return jdbcTemplate.query(GET_BY_USER_ID_QUERY,userFeedRowMapper, userId);
+    public List<UserFeed> getByUserId(long userId) {
+     return jdbcTemplate.query(GET_BY_USER_ID_QUERY,userFeedRowMapper, userId);
     }
 
-    public void deleteLikeEventsByFilmId(Long filmId) {
+    public void deleteLikeEventsByFilmId(long filmId) {
         jdbcTemplate.update(DELETE_LIKE_EVENTS_BY_FILM_ID_QUERY, filmId);
     }
 
-    public void deleteFriendEventsByFriendId(Long friendId) {
+    public void deleteFriendEventsByFriendId(long friendId) {
         jdbcTemplate.update(DELETE_FRIEND_EVENTS_BY_FRIEND_ID_QUERY, friendId);
     }
 
-    public void deleteReviewEventsByReviewId(Long reviewId) {
+    public void deleteReviewEventsByReviewId(long reviewId) {
         jdbcTemplate.update(DELETE_REVIEW_EVENTS_BY_REVIEW_ID_QUERY, reviewId);
     }
 }

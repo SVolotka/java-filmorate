@@ -2,15 +2,20 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.filmorate.dal.FilmRepository;
 import ru.yandex.practicum.filmorate.dal.GenreRepository;
 import ru.yandex.practicum.filmorate.dal.MpaRepository;
+import ru.yandex.practicum.filmorate.dal.UserFeedRepository;
 import ru.yandex.practicum.filmorate.exception.FilmNotFoundException;
 import ru.yandex.practicum.filmorate.exception.InvalidDurationException;
 import ru.yandex.practicum.filmorate.exception.InvalidReleaseDateException;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.EventType;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Operation;
+import ru.yandex.practicum.filmorate.model.UserFeed;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -24,6 +29,7 @@ public class FilmService {
     private final FilmRepository filmRepository;
     private final GenreRepository genreRepository;
     private final MpaRepository mpaRepository;
+    private final UserFeedRepository userFeedRepository;
 
     public Film create(Film film) {
         validate(film);
@@ -54,18 +60,22 @@ public class FilmService {
         return filmRepository.get(updated.getId());
     }
 
+    @Transactional
     public void addLike(long filmId, long userId) {
         if (!filmRepository.exists(filmId)) {
             throw new FilmNotFoundException("Film with id=" + filmId + " not found");
         }
         filmRepository.addLike(filmId, userId);
+        logLikeEvent(filmId, userId, Operation.ADD);
     }
 
+    @Transactional
     public void removeLike(long filmId, long userId) {
         if (!filmRepository.exists(filmId)) {
             throw new FilmNotFoundException("Film with id=" + filmId + " not found");
         }
         filmRepository.removeLike(filmId, userId);
+        logLikeEvent(filmId, userId, Operation.REMOVE);
     }
 
     public List<Film> getPopular(int count) {
@@ -74,6 +84,20 @@ public class FilmService {
 
     public List<Film> getCommonFilms(long userId, long friendId) {
         return filmRepository.getCommonFilms(userId, friendId);
+    }
+
+    public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
+        return filmRepository.getAllFilmsByDirectorAndSortedBy(directorId, sortRule);
+    }
+
+    private void validateGenres(Set<Integer> genreIds) {
+        if (genreIds == null) return;
+        List<Integer> invalid = genreIds.stream()
+                .filter(id -> genreRepository.findById(id).isEmpty())
+                .toList();
+        if (!invalid.isEmpty()) {
+            throw new NotFoundException("Жанры не найдены: " + invalid);
+        }
     }
 
     private void validate(Film film) {
@@ -97,17 +121,15 @@ public class FilmService {
         }
     }
 
-    private void validateGenres(Set<Integer> genreIds) {
-        if (genreIds == null) return;
-        List<Integer> invalid = genreIds.stream()
-                .filter(id -> genreRepository.findById(id).isEmpty())
-                .toList();
-        if (!invalid.isEmpty()) {
-            throw new NotFoundException("Жанры не найдены: " + invalid);
-        }
-    }
+    private void logLikeEvent(long filmId, long userId, Operation operation) {
+        UserFeed userFeed = new UserFeed();
 
-    public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
-        return filmRepository.getAllFilmsByDirectorAndSortedBy(directorId, sortRule);
+        userFeed.setUserId(userId);
+        userFeed.setEntityId(filmId);
+        userFeed.setEventType(EventType.LIKE);
+        userFeed.setOperation(operation);
+        userFeed.setTimestamp(System.currentTimeMillis());
+
+        userFeedRepository.create(userFeed);
     }
 }

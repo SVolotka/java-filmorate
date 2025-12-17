@@ -18,10 +18,14 @@ public class UserFeedRowMapper implements RowMapper<UserFeed> {
 
         userFeed.setEventId(rs.getLong("event_id"));
         userFeed.setUserId(rs.getLong("user_id"));
+        userFeed.setTimestamp(rs.getLong("event_timestamp"));
         userFeed.setEntityId(rs.getLong("entity_id"));
-        userFeed.setTimestamp(rs.getLong("timestamp"));
-        userFeed.setEventType(EventType.valueOf(rs.getString("even_type")));
-        userFeed.setOperation(Operation.valueOf(rs.getString("operation")));
+
+        String eventTypeStr = rs.getString("event_type");
+        userFeed.setEventType(EventType.valueOf(eventTypeStr));
+
+        String operationStr = rs.getString("operation");
+        userFeed.setOperation(Operation.valueOf(operationStr));
 
         return userFeed;
     }
