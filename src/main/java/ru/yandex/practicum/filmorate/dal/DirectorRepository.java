@@ -44,6 +44,7 @@ public class DirectorRepository {
         try {
             return jdbcTemplate.queryForObject(sqlQuery, new Object[] {directorId}, this::rowMapper);
         } catch (EmptyResultDataAccessException e) {
+            int a = 1;
             throw new NotFoundException("Режиссер с id = " + directorId + " отсутствует в БД");
         }
     }
