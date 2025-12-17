@@ -35,6 +35,14 @@ public class FilmRowMapper implements RowMapper<Film> {
             mpa = new Mpa(mpaId, mpaName);
         }
         film.setMpa(mpa);
+
+        try {
+            Long likesCount = rs.getLong("likes_count");
+            film.setRate(likesCount);
+        } catch (SQLException e) {
+            film.setRate(0L);
+        }
+
         return film;
     }
 }

@@ -1,7 +1,6 @@
 package ru.yandex.practicum.filmorate.controller;
 
 import jakarta.validation.Valid;
-import jakarta.validation.ValidationException;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -99,24 +98,6 @@ public class FilmController {
         return popularFilms;
     }
 
-    @GetMapping("/search")
-    public List<Film> searchFilms(
-            @RequestParam String query,
-            @RequestParam(required = false, defaultValue = "title") String by) {
-
-        log.info("Получен HTTP-запрос на поиск фильмов: query={}, by={}", query, by);
-
-        // Валидация для 'by'
-        if (!isValidSearchParameter(by)) {
-            throw new ValidationException("Параметр 'by' должен быть 'title', 'director' или 'director,title'");
-        }
-
-        List<Film> foundFilms = filmService.searchFilms(query, by);
-        log.info("Успешно обработан HTTP-запрос на поиск, найдено {} фильмов", foundFilms.size());
-
-        return foundFilms;
-    }
-
     @GetMapping("/common")
     public List<Film> getCommonFilms(
             @RequestParam long userId,
@@ -125,25 +106,9 @@ public class FilmController {
         return filmService.getCommonFilms(userId, friendId);
     }
 
-    @DeleteMapping("/{id}")
-    public void deleteFilmById(@PathVariable("id") long id) {
-        filmService.deleteFilmById(id);
+    @GetMapping("/search")
+    public List<Film> searchFilms(@RequestParam String query, @RequestParam String by) {
+        log.info("Получен HTTP-запрос на поиск фильмов: query={}, by={}", query, by);
+        return filmService.searchFilms(query, by);
     }
-
-    private boolean isValidSearchParameter(String by) {
-        if (by == null || by.isBlank()) {
-            return false;
-        }
-
-        // Разделяем по запятой и проверяем каждый параметр
-        String[] params = by.split(",");
-        for (String param : params) {
-            String trimmed = param.trim().toLowerCase();
-            if (!trimmed.equals("title") && !trimmed.equals("director")) {
-                return false;
-            }
-        }
-        return true;
-    }
-
 }

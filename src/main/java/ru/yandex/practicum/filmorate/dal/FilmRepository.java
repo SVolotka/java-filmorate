@@ -168,19 +168,20 @@ public class FilmRepository {
         film.setId(id);
         updateGenres(id, film.getGenreIds());
 
-        Optional<List<Director>> optDirector = Optional.ofNullable(film.getDirectors());
-        if (optDirector.isPresent()) {
-            Set<Director> directorSet = new HashSet<>(optDirector.get());
-            String sql = """
-                    INSERT INTO directors_films(film_id, director_id)
-                    VALUES(?, ?)
-                    """;
-            for (Director director : directorSet) {
-                jdbcTemplate.update(sql, director.getId(), film.getId());
+        if (film.getDirectors() != null && !film.getDirectors().isEmpty()) {
+            for (Director director : film.getDirectors()) {
+                if (director.getId() == null || !directorRepository.existsById(director.getId())) {
+                    throw new NotFoundException("Режиссер с id=" + director.getId() + " не найден");
+                }
             }
 
+            String insertDirectorQuery = "INSERT INTO directors_films(film_id, director_id) VALUES(?, ?)";
+            for (Director director : film.getDirectors()) {
+                jdbcTemplate.update(insertDirectorQuery, film.getId(), director.getId());
+            }
             film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
         }
+
         return film;
     }
 
@@ -223,17 +224,22 @@ public class FilmRepository {
             film.setGenres(new HashSet<>(genres));
         }
 
-        Optional<List<Director>> optDirector = Optional.ofNullable(film.getDirectors());
-        if (optDirector.isPresent() && !optDirector.get().isEmpty()) {
-            Set<Director> newDirectors = new HashSet<>(optDirector.get());
-            String sql = """
-                    INSERT INTO directors_films(film_id, director_id)
-                    VALUES(?, ?)
-                    """;
+        String deleteDirectorsQuery = "DELETE FROM directors_films WHERE film_id = ?";
+        jdbcTemplate.update(deleteDirectorsQuery, film.getId());
+
+        if (film.getDirectors() != null && !film.getDirectors().isEmpty()) {
+            Set<Director> newDirectors = new HashSet<>(film.getDirectors());
             for (Director director : newDirectors) {
-                jdbcTemplate.update(sql, film.getId(), director.getId());
+                if (!directorRepository.existsById(director.getId())) {
+                    throw new NotFoundException("Режиссер с id=" + director.getId() + " не найден");
+                }
             }
-            film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
+
+            String insertDirectorQuery = "INSERT INTO directors_films(film_id, director_id) VALUES(?, ?)";
+            for (Director director : newDirectors) {
+                jdbcTemplate.update(insertDirectorQuery, film.getId(), director.getId());
+            }
+            film.setDirectors(new ArrayList<>(newDirectors));
         }
 
         int rowsUpdated = jdbcTemplate.update(UPDATE_QUERY,
@@ -271,17 +277,17 @@ public class FilmRepository {
 
         // Базовый запрос
         queryBuilder.append("""
-        SELECT
-            f.film_id,
-            f.name,
-            f.description,
-            f.release_date,
-            f.duration,
-            f.mpa_id,
-            m.name as mpa_name
-        FROM films f
-        LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
-        """);
+                SELECT
+                    f.film_id,
+                    f.name,
+                    f.description,
+                    f.release_date,
+                    f.duration,
+                    f.mpa_id,
+                    m.name as mpa_name
+                FROM films f
+                LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+                """);
 
         if (genreId != null) {
             queryBuilder.append(" INNER JOIN film_genre fg ON f.film_id = fg.film_id AND fg.genre_id = ? ");
@@ -433,6 +439,12 @@ public class FilmRepository {
         return films;
     }
 
+    public boolean exists(long id) {
+        String sql = "SELECT COUNT(*) FROM films WHERE film_id = ?";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
+        return count != null && count > 0;
+    }
+
     public List<Film> searchByTitle(String query) { // добавил для задания по поиску
         String searchPattern = "%" + query.toLowerCase() + "%";
 
@@ -513,6 +525,56 @@ public class FilmRepository {
         }
     }
 
+    public List<Film> searchFilms(String query, Set<String> searchBy) {
+        String likePattern = "%" + query + "%";
+        List<Object> params = new ArrayList<>();
+
+        StringBuilder sqlBuilder = new StringBuilder("""
+        SELECT f.film_id, f.name, f.description, f.release_date, f.duration,
+               f.mpa_id, m.name AS mpa_name
+        FROM films f
+        LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+        """);
+
+        List<String> whereConditions = new ArrayList<>();
+
+        if (searchBy.contains("title")) {
+            whereConditions.add("LOWER(f.name) LIKE ?");
+            params.add(likePattern);
+        }
+
+        if (searchBy.contains("director")) {
+            sqlBuilder.append("""
+            LEFT JOIN directors_films df ON f.film_id = df.film_id
+            LEFT JOIN directors d ON df.director_id = d.id
+            """);
+            whereConditions.add("LOWER(d.name) LIKE ?");
+            params.add(likePattern);
+        }
+        if (!whereConditions.isEmpty()) {
+            sqlBuilder.append(" WHERE ").append(String.join(" OR ", whereConditions));
+        }
+
+        sqlBuilder.append("""
+        ORDER BY (
+            SELECT COUNT(*)
+            FROM likes l
+            WHERE l.film_id = f.film_id
+        ) DESC
+        """);
+
+        String sql = sqlBuilder.toString();
+        List<Film> films = jdbcTemplate.query(sql, filmRowMapper, params.toArray());
+
+        for (Film film : films) {
+            loadGenresForFilm(film);
+            loadLikesForFilm(film);
+            film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
+        }
+
+        return films;
+    }
+
     public List<Film> getRecommendedFilms(long userId) {
         String checkOnExistUser = "SELECT user_id FROM likes WHERE user_id = ?";
         List<Long> check = jdbcTemplate.query(checkOnExistUser, new Object[]{userId}, (rs, rowNum) -> rs.getLong("user_id"));
@@ -591,6 +653,7 @@ public class FilmRepository {
         return recommendedFilms;
     }
 
+
     private void loadLikesForFilm(Film film) {
         if (film == null || film.getId() == null) {
             return;
@@ -609,12 +672,6 @@ public class FilmRepository {
                 film.getId()
         );
         film.setUserIds(new HashSet<>(userIds));
-    }
-
-    public boolean exists(long id) {
-        String sql = "SELECT COUNT(*) FROM films WHERE film_id = ?";
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
-        return count != null && count > 0;
     }
 
     private List<Film> loadGenresAndDirectors(String sql, Long directorId) {

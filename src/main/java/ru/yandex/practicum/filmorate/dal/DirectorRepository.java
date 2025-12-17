@@ -97,6 +97,12 @@ public class DirectorRepository {
         jdbcTemplate.update(sqlQuery, directorId);
     }
 
+    public boolean existsById(Long directorId) {
+        String sql = "SELECT COUNT(*) FROM directors WHERE id = ?";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, directorId);
+        return count != null && count > 0;
+    }
+
     private Director rowMapper(ResultSet resultSet, int rowNum) throws SQLException {
         return Director.builder()
                 .id(resultSet.getLong("id"))
