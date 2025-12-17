@@ -4,9 +4,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.filmorate.dal.UserFeedRepository;
+import ru.yandex.practicum.filmorate.dal.FilmRepository;
 import ru.yandex.practicum.filmorate.dal.UserRepository;
 import ru.yandex.practicum.filmorate.exception.UserNotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.EventType;
 import ru.yandex.practicum.filmorate.model.Operation;
 import ru.yandex.practicum.filmorate.model.User;
@@ -20,6 +22,7 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final FilmRepository filmRepository;
     private final UserFeedRepository userFeedRepository;
 
     public User create(User user) {
@@ -98,6 +101,13 @@ public class UserService {
 
     public void deleteUserById(long userId) {
         userRepository.deleteUserById(userId);
+    }
+
+    public List<Film> getRecommendedFilms(long userId) {
+        if (!userRepository.exists(userId)) {
+            throw new UserNotFoundException("User with id=" + userId + " not found");
+        }
+        return filmRepository.getRecommendedFilms(userId);
     }
 
     private void checkAndSetName(User user) {
