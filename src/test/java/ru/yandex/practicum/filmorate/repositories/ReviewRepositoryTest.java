@@ -74,8 +74,8 @@ class ReviewRepositoryTest {
         Review newReview = Review.builder()
                 .content("Новый тестовый отзыв")
                 .isPositive(true)
-                .userId(2)
-                .filmId(2)
+                .userId(2L)
+                .filmId(2L)
                 .useful(0)
                 .build();
 
@@ -97,8 +97,8 @@ class ReviewRepositoryTest {
         Review newReview = Review.builder()
                 .content("Отзыв без полезности")
                 .isPositive(false)
-                .userId(2)
-                .filmId(1)
+                .userId(2L)
+                .filmId(1L)
                 .useful(null)
                 .build();
 
@@ -130,7 +130,7 @@ class ReviewRepositoryTest {
 
     @Test
     void shouldUpdateReview() {
-        int reviewId = 2;
+        long reviewId = 2L;
         Review originalReview = reviewRepository.getById(reviewId);
         assertThat(originalReview).isNotNull();
 
@@ -159,7 +159,7 @@ class ReviewRepositoryTest {
 
     @Test
     void shouldUpdateReviewWithNullUseful() {
-        int reviewId = 3;
+        long reviewId = 3;
         Review updatedReview = Review.builder()
                 .reviewId(reviewId)
                 .content("Обновленный отзыв")
@@ -177,7 +177,7 @@ class ReviewRepositoryTest {
     @Test
     void shouldThrowNotFoundExceptionWhenUpdatingNonExistentReview() {
         Review nonExistentReview = Review.builder()
-                .reviewId(999)
+                .reviewId(999L)
                 .content("Несуществующий отзыв")
                 .isPositive(true)
                 .useful(0)
@@ -225,8 +225,8 @@ class ReviewRepositoryTest {
         Review review5 = Review.builder()
                 .content("Еще один отзыв")
                 .isPositive(true)
-                .userId(2)
-                .filmId(1)
+                .userId(2L)
+                .filmId(1L)
                 .useful(5)
                 .build();
 

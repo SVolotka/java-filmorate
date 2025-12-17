@@ -22,7 +22,7 @@ public class ReviewLikeRepository {
             "WHERE review_id = ?";
     private final JdbcTemplate jdbc;
 
-    public void addLike(int reviewId, int userId, boolean isLike) {
+    public void addLike(long reviewId, long userId, boolean isLike) {
         log.info("Добавление {} для отзыва {} пользователем {}", isLike ? "лайка" : "дизлайка", reviewId, userId);
         Boolean existingLike = null;
         try {
@@ -57,12 +57,12 @@ public class ReviewLikeRepository {
         log.info("Голосование для отзыва {} пользователем {} успешно обработано", reviewId, userId);
     }
 
-    public void addDislike(int reviewId, int userId) {
+    public void addDislike(long reviewId, long userId) {
         log.info("Добавление дизлайка для отзыва {} пользователем {}", reviewId, userId);
         addLike(reviewId, userId, false);
     }
 
-    public void deleteLike(int reviewId, int userId) {
+    public void deleteLike(long reviewId, long userId) {
         log.info("Удаление голоса для отзыва {} пользователем {}", reviewId, userId);
         try {
             Boolean isLike = jdbc.queryForObject(CHECK_LIKE_QUERY, Boolean.class, reviewId, userId);
@@ -75,16 +75,14 @@ public class ReviewLikeRepository {
             log.warn("Попытка удалить несуществующий голос для отзыва {} пользователем {}", reviewId, userId);
             throw new NotFoundException("Голос не найден");
         }
-
-
     }
 
-    public void deleteDislike(int reviewId, int userId) {
+    public void deleteDislike(long reviewId, long userId) {
         log.info("Удаление дизлайка для отзыва {} пользователем {}", reviewId, userId);
         deleteLike(reviewId, userId);
     }
 
-    public void updateReviewUseful(int reviewId, int useful) {
+    public void updateReviewUseful(long reviewId, int useful) {
         log.debug("Обновление полезности отзыва {} на значение {}", reviewId, useful);
         int changedUseful = jdbc.update(UPDATE_USEFUL_QUERY, useful, reviewId);
         log.debug("Полезность отзыва {} изменена на {}", reviewId, changedUseful);
