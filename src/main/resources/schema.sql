@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS directors (
 
 CREATE TABLE IF NOT EXISTS users (
   user_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  login varchar(10) NOT NULL CHECK (LENGTH(login) >= 5),
+  login varchar(255) NOT NULL CHECK (LENGTH(login) >= 5),
   name varchar(255),
   email varchar(255),
   birthday TIMESTAMP
