@@ -16,6 +16,7 @@ import ru.yandex.practicum.filmorate.dal.mappers.FilmRowMapper;
 import ru.yandex.practicum.filmorate.dal.mappers.GenreRowMapper;
 import ru.yandex.practicum.filmorate.dal.mappers.MpaRowMapper;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Genre;
 
 import java.util.List;
 
@@ -30,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FilmRepositoryTest {
 
     private final FilmRepository filmRepository;
+    private final GenreRepository genreRepository;
 
     @Test
     void shouldFindAllFilms() {
@@ -60,5 +62,48 @@ class FilmRepositoryTest {
         filmRepository.removeLike(2L, 1L);
         film = filmRepository.get(2L);
         assertThat(film.getRate()).isEqualTo(1L);
+    }
+
+    @Test
+    void shouldDeletedFilmByIdWhenExistsFilm() {
+        Film film = filmRepository.get(2L);
+        List<Genre> genresBefore = genreRepository.getGenresByFilmId(2L);
+
+        assertThat(film).isNotNull();
+        assertThat(film.getName()).isEqualTo("Фильм Б");
+        assertThat(genresBefore.size()).isEqualTo(2);
+
+        filmRepository.deleteFilmById(2L);
+        List<Genre> genresAfter = genreRepository.getGenresByFilmId(2L);
+        assertThat(filmRepository.exists(2L)).isFalse();
+        assertThat(genresAfter.size()).isEqualTo(0);
+    }
+
+    @Test
+    void shouldNotAffectOtherFilmsWhenDeletingOneFilm() {
+        List<Film> allFilmsBefore = filmRepository.findAll();
+        assertThat(allFilmsBefore).hasSize(2);
+
+        long filmIdToDelete = 1L;
+        long otherFilmId = 2L;
+
+        Film filmToDelete = filmRepository.get(filmIdToDelete);
+        Film otherFilm = filmRepository.get(otherFilmId);
+
+        assertThat(filmToDelete.getName()).isEqualTo("Фильм А");
+        assertThat(otherFilm.getName()).isEqualTo("Фильм Б");
+
+        filmRepository.deleteFilmById(filmIdToDelete);
+
+        List<Film> allFilmsAfter = filmRepository.findAll();
+        assertThat(allFilmsAfter).hasSize(1);
+
+        Film remainingFilm = filmRepository.get(otherFilmId);
+        assertThat(remainingFilm).isNotNull();
+        assertThat(remainingFilm.getName()).isEqualTo("Фильм Б");
+
+        assertThat(remainingFilm.getRate()).isEqualTo(1L);
+
+        assertThat(remainingFilm.getGenres()).hasSize(2);
     }
 }

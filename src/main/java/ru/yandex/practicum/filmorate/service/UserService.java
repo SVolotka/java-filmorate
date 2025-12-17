@@ -79,6 +79,10 @@ public class UserService {
         return userRepository.getCommonFriends(userId, friendId);
     }
 
+    public void deleteUserById(long userId) {
+        userRepository.deleteUserById(userId);
+    }
+
     private void checkAndSetName(User user) {
         if (user.getName() == null || user.getName().isBlank()) {
             user.setName(user.getLogin());

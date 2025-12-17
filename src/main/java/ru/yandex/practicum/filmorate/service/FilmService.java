@@ -96,35 +96,8 @@ public class FilmService {
         return filmRepository.getCommonFilms(userId, friendId);
     }
 
-    private void validate(Film film) {
-        if (film.getName() == null || film.getName().isBlank()) {
-            throw new ValidationException("Название фильма не может быть пустым");
-        }
-        if (film.getDescription() != null && film.getDescription().length() > 200) {
-            throw new ValidationException("Описание не должно превышать 200 символов");
-        }
-        if (film.getReleaseDate() == null || film.getReleaseDate().isBefore(FILM_BIRTHDAY)) {
-            throw new InvalidReleaseDateException("Дата релиза не может быть раньше 28.12.1895");
-        }
-        if (film.getDuration() <= 0) {
-            throw new InvalidDurationException("Продолжительность должна быть положительной");
-        }
-        if (film.getMpa() == null || film.getMpa().getId() == null) {
-            throw new ValidationException("Рейтинг MPA обязателен");
-        }
-        if (mpaRepository.findById(film.getMpa().getId()).isEmpty()) {
-            throw new NotFoundException("Неизвестный рейтинг MPA: " + film.getMpa().getId());
-        }
-    }
-
-    private void validateGenres(Set<Integer> genreIds) {
-        if (genreIds == null) return;
-        List<Integer> invalid = genreIds.stream()
-                .filter(id -> genreRepository.findById(id).isEmpty())
-                .toList();
-        if (!invalid.isEmpty()) {
-            throw new NotFoundException("Жанры не найдены: " + invalid);
-        }
+    public void deleteFilmById(long filmId) {
+        filmRepository.deleteFilmById(filmId);
     }
 
     public List<Film> searchFilms(String query, String by) {
@@ -157,6 +130,34 @@ public class FilmService {
         return filmRepository.getAllFilmsByDirectorAndSortedBy(directorId, sortRule);
     }
 
+    private void validate(Film film) {
+        if (film.getName() == null || film.getName().isBlank()) {
+            throw new ValidationException("Название фильма не может быть пустым");
+        }
+        if (film.getDescription() != null && film.getDescription().length() > 200) {
+            throw new ValidationException("Описание не должно превышать 200 символов");
+        }
+        if (film.getReleaseDate() == null || film.getReleaseDate().isBefore(FILM_BIRTHDAY)) {
+            throw new InvalidReleaseDateException("Дата релиза не может быть раньше 28.12.1895");
+        }
+        if (film.getDuration() <= 0) {
+            throw new InvalidDurationException("Продолжительность должна быть положительной");
+        }
+        if (film.getMpa() == null || film.getMpa().getId() == null) {
+            throw new ValidationException("Рейтинг MPA обязателен");
+        }
+        if (mpaRepository.findById(film.getMpa().getId()).isEmpty()) {
+            throw new NotFoundException("Неизвестный рейтинг MPA: " + film.getMpa().getId());
+        }
+    }
 
-
+    private void validateGenres(Set<Integer> genreIds) {
+        if (genreIds == null) return;
+        List<Integer> invalid = genreIds.stream()
+                .filter(id -> genreRepository.findById(id).isEmpty())
+                .toList();
+        if (!invalid.isEmpty()) {
+            throw new NotFoundException("Жанры не найдены: " + invalid);
+        }
+    }
 }
