@@ -7,6 +7,7 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Repository;
 import ru.yandex.practicum.filmorate.dal.mappers.FilmRowMapper;
 import ru.yandex.practicum.filmorate.dal.mappers.GenreRowMapper;
+import ru.yandex.practicum.filmorate.dal.mappers.UserRowMapper;
 import ru.yandex.practicum.filmorate.exception.InternalServerException;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
@@ -108,6 +109,7 @@ public class FilmRepository {
     private final MpaRepository mpaRepository;
     private final GenreRepository genreRepository;
     private final DirectorRepository directorRepository;
+    private final UserRowMapper userRowMapper;
 
     public List<Film> findAll() {
         List<Film> films = jdbcTemplate.query(FIND_ALL_QUERY, filmRowMapper);
@@ -431,12 +433,6 @@ public class FilmRepository {
         return films;
     }
 
-    public boolean exists(long id) {
-        String sql = "SELECT COUNT(*) FROM films WHERE film_id = ?";
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
-        return count != null && count > 0;
-    }
-
     public List<Film> searchByTitle(String query) { // добавил для задания по поиску
         String searchPattern = "%" + query.toLowerCase() + "%";
 
@@ -517,6 +513,84 @@ public class FilmRepository {
         }
     }
 
+    public List<Film> getRecommendedFilms(long userId) {
+        String checkOnExistUser = "SELECT user_id FROM likes WHERE user_id = ?";
+        List<Long> check = jdbcTemplate.query(checkOnExistUser, new Object[]{userId}, (rs, rowNum) -> rs.getLong("user_id"));
+
+        if (check.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        String getFilmIdByUser = "SELECT film_id FROM likes WHERE user_id = ?";
+        List<Long> lisTOfFilmsByUserId = jdbcTemplate.query(getFilmIdByUser, new Object[]{userId}, (rs, rowNum) -> rs.getLong("film_id"));
+
+        String getFilmIdByOtherUsers = "SELECT user_id, film_id FROM likes WHERE user_id != ? ORDER BY user_id";
+        Map<Long, List<Long>> listOfFilmsOtherUsers = jdbcTemplate.query(getFilmIdByOtherUsers, new Object[]{userId}, rs -> {
+            Map<Long, List<Long>> result = new HashMap<>();
+            while (rs.next()) {
+                Long user = rs.getLong("user_id");
+                Long film = rs.getLong("film_id");
+
+                result.computeIfAbsent(user, k -> new ArrayList<>()).add(film);
+            }
+            return result;
+        });
+
+        Map<Long, Long> usersIdAndNumberOfMatches = new HashMap<>();
+        for (Map.Entry<Long, List<Long>> entry : listOfFilmsOtherUsers.entrySet()) {
+            List<Long> intersection = entry.getValue().stream()
+                    .filter(lisTOfFilmsByUserId::contains)
+                    .toList();
+
+            if (!intersection.isEmpty()) {
+                usersIdAndNumberOfMatches.put(entry.getKey(), (long) intersection.size());
+            }
+        }
+
+        if (usersIdAndNumberOfMatches.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> usersIdWithMaxNumberOfMatches = usersIdAndNumberOfMatches.entrySet().stream()
+                .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
+                .map(Map.Entry::getKey)
+                .limit(1)
+                .toList();
+
+        Set<Long> set1 = new HashSet<>(lisTOfFilmsByUserId);
+        Set<Long> set2 = new HashSet<>(listOfFilmsOtherUsers.get(usersIdWithMaxNumberOfMatches.getFirst()));
+
+        Set<Long> difference = set2.stream()
+                .filter(e -> !set1.contains(e))
+                .collect(Collectors.toSet());
+
+        if (difference.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        String sqlQueryGetRecommendedFilms = """
+                SELECT
+                    f.film_id,
+                    f.name,
+                    f.description,
+                    f.release_date,
+                    f.duration,
+                    f.mpa_id,
+                    m.name as mpa_name
+                FROM films f
+                LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+                WHERE f.film_id IN (?)
+                """;
+
+        List<Film> recommendedFilms = jdbcTemplate.query(sqlQueryGetRecommendedFilms, filmRowMapper, difference.toArray());
+        for (Film film : recommendedFilms) {
+            loadGenresForFilm(film);
+            loadLikesForFilm(film);
+        }
+
+        return recommendedFilms;
+    }
+
     private void loadLikesForFilm(Film film) {
         if (film == null || film.getId() == null) {
             return;
@@ -535,6 +609,12 @@ public class FilmRepository {
                 film.getId()
         );
         film.setUserIds(new HashSet<>(userIds));
+    }
+
+    public boolean exists(long id) {
+        String sql = "SELECT COUNT(*) FROM films WHERE film_id = ?";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
+        return count != null && count > 0;
     }
 
     private List<Film> loadGenresAndDirectors(String sql, Long directorId) {
