@@ -2,12 +2,12 @@ package ru.yandex.practicum.filmorate.dal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Repository;
 import ru.yandex.practicum.filmorate.dal.mappers.FilmRowMapper;
 import ru.yandex.practicum.filmorate.dal.mappers.GenreRowMapper;
-import ru.yandex.practicum.filmorate.dal.mappers.UserRowMapper;
 import ru.yandex.practicum.filmorate.exception.InternalServerException;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
@@ -72,29 +72,10 @@ public class FilmRepository {
     private static final String GET_LIKES_COUNT_QUERY = "SELECT COUNT(*) FROM likes WHERE film_id = ?";
     private static final String GET_LIKED_USERS_QUERY = "SELECT user_id FROM likes WHERE film_id = ?";
 
-    private static final String GET_POPULAR_FILMS_QUERY = """
-            SELECT
-                f.film_id,
-                f.name,
-                f.description,
-                f.release_date,
-                f.duration,
-                f.mpa_id,
-                m.name AS mpa_name
-            FROM films f
-            LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
-            ORDER BY (
-                SELECT COUNT(*)
-                FROM likes l
-                WHERE l.film_id = f.film_id
-            ) DESC
-            LIMIT ?
-            """;
-
     private static final String FIND_GENRES_BY_FILM_ID = """
             SELECT g.genre_id, g.name
-            FROM film_genre fg
-            JOIN genres g ON fg.genre_id = g.genre_id
+            FROM genres g
+            INNER JOIN film_genre fg ON g.genre_id = fg.genre_id
             WHERE fg.film_id = ?
             ORDER BY g.genre_id
             """;
@@ -109,12 +90,28 @@ public class FilmRepository {
     private final MpaRepository mpaRepository;
     private final GenreRepository genreRepository;
     private final DirectorRepository directorRepository;
-    private final UserRowMapper userRowMapper;
 
     public List<Film> findAll() {
-        List<Film> films = jdbcTemplate.query(FIND_ALL_QUERY, filmRowMapper);
-        loadGenresForFilms(films);
+        String query = """
+        SELECT
+            f.film_id,
+            f.name,
+            f.description,
+            f.release_date,
+            f.duration,
+            f.mpa_id,
+            m.name as mpa_name
+        FROM films f
+        LEFT JOIN mpa_rating m ON f.mpa_id = m.rating_id
+        """;
+
+        List<Film> films = jdbcTemplate.query(query, filmRowMapper);
+
         for (Film film : films) {
+            Long filmId = film.getId();
+            loadGenresForFilm(film);
+            List<Director> directors = directorRepository.getDirectorsByFilmId(filmId);
+            film.setDirectors(directors);
             loadLikesForFilm(film);
         }
         return films;
@@ -186,7 +183,13 @@ public class FilmRepository {
     }
 
     public Film get(long id) {
-        Film film = jdbcTemplate.queryForObject(FIND_BY_ID_QUERY, filmRowMapper, id);
+Film film;
+        try {
+             film = jdbcTemplate.queryForObject(FIND_BY_ID_QUERY, filmRowMapper, id);
+        } catch (EmptyResultDataAccessException e) {
+            throw new NotFoundException("Фильм с id = " + id + " отсутствует в БД");
+        }
+
         loadGenresForFilm(film);
         loadLikesForFilm(film);
         film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
@@ -194,6 +197,10 @@ public class FilmRepository {
     }
 
     public Film update(Film film) {
+        if (!exists(film.getId())) {
+            throw new NotFoundException("Фильм с id = " + film.getId() + " отсутствует в БД");
+        }
+
         if (film.getMpa() == null || film.getMpa().getId() == null) {
             throw new ValidationException("Рейтинг MPA обязателен");
         }
@@ -256,6 +263,7 @@ public class FilmRepository {
         }
 
         updateGenres(film.getId(), film.getGenreIds());
+        film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
 
         return film;
     }
@@ -275,7 +283,6 @@ public class FilmRepository {
         StringBuilder queryBuilder = new StringBuilder();
         List<Object> params = new ArrayList<>();
 
-        // Базовый запрос
         queryBuilder.append("""
                 SELECT
                     f.film_id,
@@ -301,10 +308,8 @@ public class FilmRepository {
             hasWhere = true;
         }
 
-        // Сортируем по количеству лайков
         queryBuilder.append(" ORDER BY (SELECT COUNT(*) FROM likes l WHERE l.film_id = f.film_id) DESC ");
 
-        // Добавляем LIMIT только если count указан и больше 0
         if (count != null && count > 0) {
             queryBuilder.append(" LIMIT ? ");
             params.add(count);
@@ -320,20 +325,13 @@ public class FilmRepository {
             }
         }
 
-        return films;
-    }
-
-    public void loadGenresForFilm(Film film) {
-        if (film == null || film.getId() == null) {
-            return;
+        for (Film film : films) {
+            List<Genre> genres = genreRepository.getGenresByFilmId(film.getId());
+            film.setGenres(new HashSet<>(genres));
+            film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
         }
 
-        List<Genre> genres = jdbcTemplate.query(
-                FIND_GENRES_BY_FILM_ID,
-                genreRowMapper,
-                film.getId()
-        );
-        film.setGenres(new LinkedHashSet<>(genres));
+        return films;
     }
 
     public void loadGenresForFilms(List<Film> films) {
@@ -445,26 +443,13 @@ public class FilmRepository {
         return count != null && count > 0;
     }
 
-    public List<Film> searchByTitle(String query) { // добавил для задания по поиску
-        String searchPattern = "%" + query.toLowerCase() + "%";
-
-        String searchQuery = FIND_ALL_QUERY +
-                " WHERE LOWER(f.name) LIKE ? " +
-                " ORDER BY (SELECT COUNT(*) FROM likes l WHERE l.film_id = f.film_id) DESC";
-
-        List<Film> films = jdbcTemplate.query(searchQuery, filmRowMapper, searchPattern);
-
-        if (!films.isEmpty()) {
-            loadGenresForFilms(films);
-        }
-
-        return films;
-    }
-
-
     public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
         if (sortRule == null) {
             throw new NotFoundException("Параметр для сортировки не задан.");
+        }
+
+        if (!directorRepository.existsById(directorId)) {
+            throw new NotFoundException("Режиссер с id=" + directorId + " не найден");
         }
 
         switch (sortRule) {
@@ -649,22 +634,26 @@ public class FilmRepository {
             loadGenresForFilm(film);
             loadLikesForFilm(film);
         }
+        loadDirectorsForFilms(recommendedFilms);
 
         return recommendedFilms;
     }
-
 
     private void loadLikesForFilm(Film film) {
         if (film == null || film.getId() == null) {
             return;
         }
 
-        Long count = jdbcTemplate.queryForObject(
-                GET_LIKES_COUNT_QUERY,
-                Long.class,
-                film.getId()
-        );
-        film.setRate(count != null ? count : 0L);
+        try {
+            Long count = jdbcTemplate.queryForObject(
+                    GET_LIKES_COUNT_QUERY,
+                    Long.class,
+                    film.getId()
+            );
+            film.setRate(count != null ? count : 0L);
+        } catch (EmptyResultDataAccessException e) {
+            film.setRate(0L);
+        }
 
         List<Long> userIds = jdbcTemplate.queryForList(
                 GET_LIKED_USERS_QUERY,
@@ -682,5 +671,49 @@ public class FilmRepository {
             film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
         }
         return films;
+    }
+
+    public void loadDirectorsForFilms(List<Film> films) {
+        if (films.isEmpty()) return;
+
+        List<Long> filmIds = films.stream()
+                .map(Film::getId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (filmIds.isEmpty()) return;
+
+        String inClause = String.join(",", Collections.nCopies(filmIds.size(), "?"));
+        String query = """
+            SELECT df.film_id, d.id, d.name
+            FROM directors_films df
+            JOIN directors d ON df.director_id = d.id
+            WHERE df.film_id IN (%s)
+            ORDER BY df.film_id, d.id
+            """.formatted(inClause);
+
+        Map<Long, List<Director>> directorsByFilmId = new HashMap<>();
+        jdbcTemplate.query(query, rs -> {
+            while (rs.next()) {
+                long filmId = rs.getLong("film_id");
+                Director director = Director.builder().id(rs.getLong("id")).name(rs.getString("name")).build();
+                directorsByFilmId.computeIfAbsent(filmId, k -> new ArrayList<>()).add(director);
+            }
+        }, filmIds.toArray());
+
+        for (Film film : films) {
+            film.setDirectors(directorsByFilmId.getOrDefault(film.getId(), new ArrayList<>()));
+        }
+    }
+
+    private void loadGenresForFilm(Film film) {
+        if (film == null || film.getId() == null) {
+            return;
+        }
+
+        List<Genre> genres = jdbcTemplate.query(FIND_GENRES_BY_FILM_ID,
+                (rs, rowNum) -> new Genre(rs.getInt("genre_id"), rs.getString("name")),
+                film.getId());
+        film.setGenres(new LinkedHashSet<>(genres));
     }
 }

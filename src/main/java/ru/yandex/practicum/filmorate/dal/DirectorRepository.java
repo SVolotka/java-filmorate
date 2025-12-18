@@ -94,6 +94,8 @@ public class DirectorRepository {
                 DELETE FROM directors
                 WHERE id = ?""";
 
+        jdbcTemplate.update("DELETE FROM directors_films WHERE director_id = ?", directorId);
+
         jdbcTemplate.update(sqlQuery, directorId);
     }
 

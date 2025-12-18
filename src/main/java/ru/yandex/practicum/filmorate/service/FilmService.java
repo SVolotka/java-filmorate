@@ -9,6 +9,7 @@ import ru.yandex.practicum.filmorate.dal.FilmRepository;
 import ru.yandex.practicum.filmorate.dal.GenreRepository;
 import ru.yandex.practicum.filmorate.dal.MpaRepository;
 import ru.yandex.practicum.filmorate.dal.UserFeedRepository;
+import ru.yandex.practicum.filmorate.dal.UserRepository;
 import ru.yandex.practicum.filmorate.exception.FilmNotFoundException;
 import ru.yandex.practicum.filmorate.exception.InvalidDurationException;
 import ru.yandex.practicum.filmorate.exception.InvalidReleaseDateException;
@@ -38,6 +39,7 @@ public class FilmService {
     private final MpaRepository mpaRepository;
     private final UserFeedRepository userFeedRepository;
     private final DirectorRepository directorRepository;
+    private final UserRepository userRepository;
 
     public Film create(Film film) {
         validate(film);
@@ -85,11 +87,20 @@ public class FilmService {
         return filmRepository.get(updated.getId());
     }
 
+    public void deleteFilmById(long filmId) {
+        filmRepository.deleteFilmById(filmId);
+    }
+
     @Transactional
     public void addLike(long filmId, long userId) {
         if (!filmRepository.exists(filmId)) {
             throw new FilmNotFoundException("Film with id=" + filmId + " not found");
         }
+
+        if (!userRepository.exists(userId)) {
+            throw new NotFoundException("User with id=" + userId + " not found");
+        }
+
         filmRepository.addLike(filmId, userId);
         logLikeEvent(filmId, userId, Operation.ADD);
     }
@@ -99,6 +110,11 @@ public class FilmService {
         if (!filmRepository.exists(filmId)) {
             throw new FilmNotFoundException("Film with id=" + filmId + " not found");
         }
+
+        if (!userRepository.exists(userId)) {
+            throw new NotFoundException("User with id=" + userId + " not found");
+        }
+
         filmRepository.removeLike(filmId, userId);
         logLikeEvent(filmId, userId, Operation.REMOVE);
     }
@@ -121,7 +137,6 @@ public class FilmService {
             }
         }
 
-        // Передаем null в репозиторий, если count не указан
         return filmRepository.getPopularFilms(count, genreId, year);
     }
 

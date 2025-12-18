@@ -18,7 +18,7 @@ import java.util.List;
 @Repository
 @RequiredArgsConstructor
 public class ReviewRepository {
-    private static final String FIND_ALL_LIMIT_QUERY = "SELECT * FROM reviews ORDER BY useful DESC, review_id LIMIT ?";
+    private static final String FIND_ALL_LIMIT_QUERY = "SELECT * FROM reviews ORDER BY useful DESC LIMIT ?";
     private static final String FIND_BY_FILM_ID_LIMIT_QUERY = "SELECT * FROM reviews WHERE film_id = ? " +
             "ORDER BY useful DESC, review_id LIMIT ?";
     private static final String FIND_BY_ID_QUERY = "SELECT * FROM reviews r " +
@@ -26,7 +26,7 @@ public class ReviewRepository {
     private static final String CREATE_QUERY = "INSERT INTO reviews " +
             "(content, is_positive, user_id, film_id, useful) VALUES (?, ?, ?, ?, ?)";
     private static final String DELETE_QUERY = "DELETE FROM reviews WHERE review_id = ?";
-    private static final String UPDATE_QUERY = "UPDATE reviews SET content = ?, is_positive = ?, useful = ? WHERE review_id = ?";
+    private static final String UPDATE_QUERY = "UPDATE reviews SET content = ?, is_positive = ? WHERE review_id = ?";
 
     private final JdbcTemplate jdbc;
     private final ReviewRowMapper reviewRowMapper;
@@ -109,9 +109,8 @@ public class ReviewRepository {
         int update = jdbc.update(UPDATE_QUERY,
                 review.getContent(),
                 review.getIsPositive(),
-                review.getUseful() != null ? review.getUseful() : 0,
                 review.getReviewId()
-                );
+        );
 
         if (update == 0) {
             log.error("Отзыв с id {} не найден для обновления", review.getReviewId());

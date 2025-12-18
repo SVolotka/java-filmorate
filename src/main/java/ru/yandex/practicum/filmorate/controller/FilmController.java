@@ -89,7 +89,6 @@ public class FilmController {
             @RequestParam(required = false) Integer genreId,
             @RequestParam(required = false) Integer year) { // заменил метод Сергея
 
-        // Если count не указан, передаем null в сервис
         log.info("Получен HTTP-запрос: count={}, genreId={}, year={}", count, genreId, year);
 
         List<Film> popularFilms = filmService.getPopular(count, genreId, year);
@@ -104,6 +103,11 @@ public class FilmController {
             @RequestParam long friendId) {
         log.info("GET /films/common: userId={}, friendId={}", userId, friendId);
         return filmService.getCommonFilms(userId, friendId);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteFilmById(@PathVariable("id") long id) {
+        filmService.deleteFilmById(id);
     }
 
     @GetMapping("/search")

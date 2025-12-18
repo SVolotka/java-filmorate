@@ -3,7 +3,9 @@ package ru.yandex.practicum.filmorate.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.filmorate.dal.DirectorRepository;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Director;
 
 import java.util.Collection;
@@ -31,6 +33,9 @@ public class DirectorService {
 
     public Director createDirector(Director director) {
         log.info("Отправляем запрос на создание в БД записи о режиссере ...");
+        if (directorRepository.existsById(director.getId())) {
+            throw new NotFoundException("Режиссер с id = " + director.getId() + " уже существует в БД");
+        }
         Director newDirector = directorRepository.createDirector(director);
         log.info("Режиссер добавлен в БД.");
         return newDirector;
@@ -38,14 +43,22 @@ public class DirectorService {
 
     public Director updateDirector(Director director) {
         log.info("Отправляем запрос на обновление данных о режиссере ...");
+
         Director updatedDirector = directorRepository.updateDirector(director);
         log.info("Информация о фильме с id = {} обновлена", director.getId());
         return updatedDirector;
     }
 
+    @Transactional
     public void deleteDirector(Long directorId) {
         log.info("Отправляем запрос на удаление режиссера с id {}", directorId);
+        if (!directorRepository.existsById(directorId)) {
+            throw new NotFoundException("Режиссер с id = " + directorId + " отсутствует в БД");
+        }
+
         directorRepository.deleteDirector(directorId);
+
+
         log.info("Запись о режиссере с id = {} удалена из БД.", directorId);
     }
 }

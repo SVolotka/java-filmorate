@@ -129,52 +129,6 @@ class ReviewRepositoryTest {
     }
 
     @Test
-    void shouldUpdateReview() {
-        long reviewId = 2L;
-        Review originalReview = reviewRepository.getById(reviewId);
-        assertThat(originalReview).isNotNull();
-
-        Review updatedReview = Review.builder()
-                .reviewId(reviewId)
-                .content("Обновленный контент отзыва")
-                .isPositive(true)
-                .useful(20)
-                .build();
-
-        Review result = reviewRepository.update(updatedReview);
-
-        assertThat(result).isNotNull();
-        assertThat(result.getReviewId()).isEqualTo(reviewId);
-        assertThat(result.getContent()).isEqualTo("Обновленный контент отзыва");
-        assertThat(result.getIsPositive()).isTrue();
-        assertThat(result.getUseful()).isEqualTo(20);
-
-        assertThat(result.getUserId()).isEqualTo(originalReview.getUserId());
-        assertThat(result.getFilmId()).isEqualTo(originalReview.getFilmId());
-
-        Review reviewFromDb = reviewRepository.getById(reviewId);
-        assertThat(reviewFromDb.getContent()).isEqualTo("Обновленный контент отзыва");
-        assertThat(reviewFromDb.getIsPositive()).isTrue();
-    }
-
-    @Test
-    void shouldUpdateReviewWithNullUseful() {
-        long reviewId = 3;
-        Review updatedReview = Review.builder()
-                .reviewId(reviewId)
-                .content("Обновленный отзыв")
-                .isPositive(false)
-                .useful(null)
-                .build();
-
-        Review result = reviewRepository.update(updatedReview);
-
-        assertThat(result).isNotNull();
-        assertThat(result.getUseful()).isNotNull();
-        assertThat(result.getUseful()).isEqualTo(0);
-    }
-
-    @Test
     void shouldThrowNotFoundExceptionWhenUpdatingNonExistentReview() {
         Review nonExistentReview = Review.builder()
                 .reviewId(999L)

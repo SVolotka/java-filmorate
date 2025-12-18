@@ -1,6 +1,7 @@
 package ru.yandex.practicum.filmorate.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -17,21 +18,30 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @NoArgsConstructor
 public class Film {
+    @JsonProperty("id")
+    @Positive
     private Long id;
+    @JsonProperty("name")
     @NotBlank(message = "Название фильма не может быть null или пустым")
     private String name;
+    @JsonProperty("description")
     @Size(max = 200, message = "Длина описания не должна превышать 200 символов")
     private String description;
+    @JsonProperty("releaseDate")
     @NotNull(message = "Дата релиза не может быть null")
     private LocalDate releaseDate;
+    @JsonProperty("duration")
     @Positive(message = "Продолжительность фильма должна быть положительной")
     private long duration;
 
+    @JsonProperty("mpa")
     @NotNull(message = "Рейтинг MPA обязателен")
     private Mpa mpa;
 
+    @JsonProperty("genres")
     private Set<Genre> genres = new LinkedHashSet<>();
 
+    @JsonProperty("directors")
     private List<Director> directors = new ArrayList<>();
 
     @JsonIgnore

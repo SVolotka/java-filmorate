@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -27,7 +28,7 @@ public class DirectorController {
     }
 
     @PostMapping("/directors")
-    public Director createDirector(@NotNull(message = "Передано пустое значение Director") @RequestBody Director director) {
+    public Director createDirector(@NotNull(message = "Передано пустое значение Director")@Valid @RequestBody Director director) {
         return directorService.createDirector(director);
     }
 
