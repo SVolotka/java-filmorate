@@ -9,11 +9,10 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Director;
+import ru.yandex.practicum.filmorate.model.Film;
 
 import java.sql.*;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -27,7 +26,8 @@ public class DirectorRepository {
     public Map<Long, Director> getAllDirectors() {
         String sqlQuery = """
                 SELECT *
-                FROM directors""";
+                FROM directors
+                """;
 
         List<Director> directors = jdbcTemplate.query(sqlQuery, this::rowMapper);
 
@@ -39,7 +39,8 @@ public class DirectorRepository {
         String sqlQuery = """
                 SELECT *
                 FROM directors
-                WHERE id = ?""";
+                WHERE id = ?
+                """;
 
         try {
             return jdbcTemplate.queryForObject(sqlQuery, new Object[] {directorId}, this::rowMapper);
@@ -54,7 +55,8 @@ public class DirectorRepository {
                 FROM directors d
                 LEFT JOIN directors_films df ON d.id = df.director_id
                 LEFT JOIN films f ON df.film_id = f.film_id
-                WHERE f.film_id = ?""";
+                WHERE f.film_id = ?
+                """;
         return jdbcTemplate.query(sqlQuery, this::rowMapper, filmId);
     }
 
@@ -73,7 +75,6 @@ public class DirectorRepository {
     }
 
     public Director updateDirector(Director director) {
-
         try {
             getDirectorById(director.getId());
         } catch (EmptyResultDataAccessException e) {
@@ -83,7 +84,8 @@ public class DirectorRepository {
         String sqlQuery = """
                 UPDATE directors
                 SET name = ?
-                WHERE id = ?""";
+                WHERE id = ?
+                """;
 
         jdbcTemplate.update(sqlQuery, director.getName(), director.getId());
         return director;
@@ -92,7 +94,8 @@ public class DirectorRepository {
     public void deleteDirector(Long directorId) {
         String sqlQuery = """
                 DELETE FROM directors
-                WHERE id = ?""";
+                WHERE id = ?
+                """;
 
         jdbcTemplate.update("DELETE FROM directors_films WHERE director_id = ?", directorId);
 
@@ -103,6 +106,56 @@ public class DirectorRepository {
         String sql = "SELECT COUNT(*) FROM directors WHERE id = ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, directorId);
         return count != null && count > 0;
+    }
+
+    public List<Long> findAllExistingIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        String includedId = ids.stream().map(String::valueOf).collect(Collectors.joining());
+
+        String sql = String.format("SELECT id FROM directors WHERE id IN (%s)", includedId);
+        return jdbcTemplate.queryForList(sql, Long.class);
+    }
+
+    public Map<Long, List<Director>> getDirectorsForFilms(Collection<Film> films) {
+        if (films == null || films.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        List<Long> filmIds = films.stream()
+                .filter(film -> film.getId() != null)
+                .map(Film::getId)
+                .distinct()
+                .toList();
+
+        if (filmIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        String placeholders = String.join(",", Collections.nCopies(filmIds.size(), "?"));
+        String sql = String.format("""
+        SELECT df.film_id, d.id, d.name
+        FROM directors_films df
+        JOIN directors d ON df.director_id = d.id
+        WHERE df.film_id IN (%s)
+        ORDER BY df.film_id, d.id
+        """, placeholders);
+
+        Map<Long, List<Director>> directorsByFilmId = new HashMap<>();
+
+        jdbcTemplate.query(sql, filmIds.toArray(), rs -> {
+            Long filmId = rs.getLong("film_id");
+            Director director = Director.builder()
+                    .id(rs.getLong("id"))
+                    .name(rs.getString("name"))
+                    .build();
+
+            directorsByFilmId.computeIfAbsent(filmId, k -> new ArrayList<>()).add(director);
+        });
+
+        return directorsByFilmId;
     }
 
     private Director rowMapper(ResultSet resultSet, int rowNum) throws SQLException {

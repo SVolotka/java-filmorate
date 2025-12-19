@@ -40,16 +40,14 @@ class FilmRepositoryTest {
         assertThat(films).hasSize(2);
     }
 
-    /*@Test
+    @Test
     void shouldGetPopularFilms() {
-        List<Film> popular = filmRepository.getPopularFilms(10);
-        assertThat(popular).hasSize(2);
+        List<Film> popular = filmRepository.getPopularFilms(10, 1, 2000);
+        assertThat(popular).hasSize(1);
 
-        assertThat(popular.get(0).getId()).isEqualTo(1L);
-        assertThat(popular.get(0).getRate()).isEqualTo(2L);
-        assertThat(popular.get(1).getId()).isEqualTo(2L);
-        assertThat(popular.get(1).getRate()).isEqualTo(1L);
-    }*/
+        assertThat(popular.getFirst().getId()).isEqualTo(1L);
+        assertThat(popular.getFirst().getRate()).isEqualTo(2L);
+    }
 
     @Test
     void shouldAddAndRemoveLike() {

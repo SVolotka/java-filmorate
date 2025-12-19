@@ -33,7 +33,7 @@ public class DirectorController {
     }
 
     @PutMapping("/directors")
-    public Director updateDirector(@NotNull(message = "Передано пустое значение Director") @RequestBody Director director) {
+    public Director updateDirector(@NotNull(message = "Передано пустое значение Director")@Valid @RequestBody Director director) {
         return directorService.updateDirector(director);
     }
 

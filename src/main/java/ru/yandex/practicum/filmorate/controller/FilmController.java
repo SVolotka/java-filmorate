@@ -36,7 +36,7 @@ public class FilmController {
 
     @GetMapping("/director/{directorId}")
     public Collection<Film> getAllFilmsByDirectorAndSortedBy(
-            @PathVariable("directorId") @NotNull(message = "id режиссера должно быть указано") Long directorId,
+            @PathVariable @NotNull(message = "id режиссера должно быть указано") Long directorId,
             @RequestParam("sortBy") String sortRule
     ) {
         log.info("Получен HTTP-запрос на получение списка фильмов режиссера с id: {}", directorId);
@@ -87,7 +87,7 @@ public class FilmController {
     public List<Film> getPopular(
             @RequestParam(required = false) Integer count,
             @RequestParam(required = false) Integer genreId,
-            @RequestParam(required = false) Integer year) { // заменил метод Сергея
+            @RequestParam(required = false) Integer year) {
 
         log.info("Получен HTTP-запрос: count={}, genreId={}, year={}", count, genreId, year);
 
