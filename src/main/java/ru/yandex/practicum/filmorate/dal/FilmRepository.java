@@ -22,6 +22,8 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class FilmRepository {
+    private  static final String YEAR = "year";
+    private static  final String LIKES = "likes";
     private static final String FIND_BY_ID_QUERY = """
                 SELECT
                     f.film_id,
@@ -420,7 +422,7 @@ public class FilmRepository {
         }
 
         switch (sortRule) {
-            case "year" -> {
+            case YEAR -> {
                 String sql = """
                 SELECT
                     f.film_id,
@@ -438,7 +440,7 @@ public class FilmRepository {
 
                 return loadGenresAndDirectors(sql, directorId);
             }
-            case "likes" -> {
+            case LIKES -> {
                 String sql = """
                 SELECT
                     f.film_id,
@@ -628,11 +630,10 @@ public class FilmRepository {
 
     private List<Film> loadGenresAndDirectors(String sql, Long directorId) {
         List<Film> films = jdbcTemplate.query(sql, filmRowMapper, directorId);
-        for (Film film : films) {
-            List<Genre> genres = genreRepository.getGenresByFilmId(film.getId());
-            film.setGenres(new HashSet<>(genres));
-            film.setDirectors(directorRepository.getDirectorsByFilmId(film.getId()));
-        }
+
+        loadGenresForFilms(films);
+        loadDirectorsForFilms(films);
+
         return films;
     }
 

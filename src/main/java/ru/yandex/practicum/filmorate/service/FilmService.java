@@ -14,10 +14,7 @@ import ru.yandex.practicum.filmorate.exception.InvalidDurationException;
 import ru.yandex.practicum.filmorate.exception.InvalidReleaseDateException;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
-import ru.yandex.practicum.filmorate.model.EventType;
-import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.model.Operation;
-import ru.yandex.practicum.filmorate.model.UserFeed;
+import ru.yandex.practicum.filmorate.model.*;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -147,8 +144,14 @@ public class FilmService {
         if (genreIds == null) {
             return;
         }
+
+        List<Integer> genres = genreRepository.findAll()
+                .stream()
+                .map(Genre::getId)
+                .toList();
+
         List<Integer> invalid = genreIds.stream()
-                .filter(id -> genreRepository.findById(id).isEmpty())
+                .filter(id -> !genres.contains(id))
                 .toList();
         if (!invalid.isEmpty()) {
             throw new NotFoundException("Жанры не найдены: " + invalid);
