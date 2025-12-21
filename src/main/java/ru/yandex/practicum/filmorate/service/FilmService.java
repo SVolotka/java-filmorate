@@ -1,33 +1,41 @@
 package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.filmorate.dal.FilmRepository;
 import ru.yandex.practicum.filmorate.dal.GenreRepository;
 import ru.yandex.practicum.filmorate.dal.MpaRepository;
+import ru.yandex.practicum.filmorate.dal.UserFeedRepository;
+import ru.yandex.practicum.filmorate.dal.UserRepository;
 import ru.yandex.practicum.filmorate.exception.FilmNotFoundException;
 import ru.yandex.practicum.filmorate.exception.InvalidDurationException;
 import ru.yandex.practicum.filmorate.exception.InvalidReleaseDateException;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
-import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.*;
 
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class FilmService {
     private static final LocalDate FILM_BIRTHDAY = LocalDate.of(1895, 12, 28);
 
     private final FilmRepository filmRepository;
     private final GenreRepository genreRepository;
     private final MpaRepository mpaRepository;
+    private final UserFeedRepository userFeedRepository;
+    private final UserRepository userRepository;
 
     public Film create(Film film) {
         validate(film);
         validateGenres(film.getGenreIds());
+
         Film saved = filmRepository.create(film);
         return filmRepository.get(saved.getId());
     }
@@ -49,27 +57,105 @@ public class FilmService {
             throw new FilmNotFoundException("Film with id=" + film.getId() + " not found");
         }
         validateGenres(film.getGenreIds());
+
         Film updated = filmRepository.update(film);
-        filmRepository.updateGenres(updated.getId(), film.getGenreIds());
         return filmRepository.get(updated.getId());
     }
 
+    public void deleteFilmById(long filmId) {
+        filmRepository.deleteFilmById(filmId);
+    }
+
+    @Transactional
     public void addLike(long filmId, long userId) {
         if (!filmRepository.exists(filmId)) {
             throw new FilmNotFoundException("Film with id=" + filmId + " not found");
         }
+
+        if (!userRepository.exists(userId)) {
+            throw new NotFoundException("User with id=" + userId + " not found");
+        }
+
         filmRepository.addLike(filmId, userId);
+        logLikeEvent(filmId, userId, Operation.ADD);
     }
 
+    @Transactional
     public void removeLike(long filmId, long userId) {
         if (!filmRepository.exists(filmId)) {
             throw new FilmNotFoundException("Film with id=" + filmId + " not found");
         }
+
+        if (!userRepository.exists(userId)) {
+            throw new NotFoundException("User with id=" + userId + " not found");
+        }
+
         filmRepository.removeLike(filmId, userId);
+        logLikeEvent(filmId, userId, Operation.REMOVE);
     }
 
-    public List<Film> getPopular(int count) {
-        return filmRepository.getPopularFilms(count);
+    public List<Film> getPopular(Integer count, Integer genreId, Integer year) {
+        // Валидация count если указан
+        if (count != null && count <= 0) {
+            throw new ValidationException("Параметр должен быть положительным числом");
+        }
+
+        if (genreId != null) {
+            if (genreRepository.findById(genreId).isEmpty()) {
+                throw new NotFoundException("Жанр с id=" + genreId + " не найден");
+            }
+        }
+
+        if (year != null) {
+            if (year < 1895 || year > LocalDate.now().getYear() + 1) {
+                throw new ValidationException("Год должен быть между 1895 и " + (LocalDate.now().getYear() + 1));
+            }
+        }
+
+        return filmRepository.getPopularFilms(count, genreId, year);
+    }
+
+    public List<Film> getCommonFilms(long userId, long friendId) {
+        return filmRepository.getCommonFilms(userId, friendId);
+    }
+
+    public List<Film> getAllFilmsByDirectorAndSortedBy(Long directorId, String sortRule) {
+        return filmRepository.getAllFilmsByDirectorAndSortedBy(directorId, sortRule);
+    }
+
+    public List<Film> searchFilms(String query, String by) {
+        if (query == null || query.trim().isEmpty()) {
+            throw new ValidationException("Параметр query не может быть пустым");
+        }
+
+        Set<String> searchBy = Arrays.stream(by.split(","))
+                .map(String::trim)
+                .collect(Collectors.toSet());
+
+        Set<String> validCriteria = new HashSet<>(Arrays.asList("director", "title"));
+        if (!validCriteria.containsAll(searchBy)) {
+            throw new ValidationException("Недопустимые критерии поиска. Используйте 'director', 'title' или оба значения через запятую");
+        }
+
+        return filmRepository.searchFilms(query.toLowerCase().trim(), searchBy);
+    }
+
+    private void validateGenres(Set<Integer> genreIds) {
+        if (genreIds == null) {
+            return;
+        }
+
+        List<Integer> genres = genreRepository.findAll()
+                .stream()
+                .map(Genre::getId)
+                .toList();
+
+        List<Integer> invalid = genreIds.stream()
+                .filter(id -> !genres.contains(id))
+                .toList();
+        if (!invalid.isEmpty()) {
+            throw new NotFoundException("Жанры не найдены: " + invalid);
+        }
     }
 
     private void validate(Film film) {
@@ -93,13 +179,15 @@ public class FilmService {
         }
     }
 
-    private void validateGenres(Set<Integer> genreIds) {
-        if (genreIds == null) return;
-        List<Integer> invalid = genreIds.stream()
-                .filter(id -> genreRepository.findById(id).isEmpty())
-                .toList();
-        if (!invalid.isEmpty()) {
-            throw new NotFoundException("Жанры не найдены: " + invalid);
-        }
+    private void logLikeEvent(long filmId, long userId, Operation operation) {
+        UserFeed userFeed = new UserFeed();
+
+        userFeed.setUserId(userId);
+        userFeed.setEntityId(filmId);
+        userFeed.setEventType(EventType.LIKE);
+        userFeed.setOperation(operation);
+        userFeed.setTimestamp(System.currentTimeMillis());
+
+        userFeedRepository.create(userFeed);
     }
 }

@@ -11,7 +11,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.model.UserFeed;
 import ru.yandex.practicum.filmorate.service.UserService;
 
 import java.util.Collection;
@@ -85,5 +87,26 @@ public class UserController {
         List<User> commonFriends = userService.getCommonFriends(id, otherId);
         log.info("Успешно обработан HTTP-запрос на получение общих друзей пользователей с id: {} и {}", id, otherId);
         return commonFriends;
+    }
+
+    @GetMapping("/{id}/feed")
+    public List<UserFeed> getUserFeed(@PathVariable long id) {
+        log.info("Получен HTTP-запрос на получение ленты событий пользователя с id: {}", id);
+        List<UserFeed> existingUserFeed = userService.getUserFeed(id);
+        log.info("Успешно обработан HTTP-запрос на получение ленты событий пользователя с id: {}", id);
+        return existingUserFeed;
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteUserById(@PathVariable("id") long id) {
+        userService.deleteUserById(id);
+    }
+
+    @GetMapping("/{id}/recommendations")
+    public List<Film> getRecommendedFilms(@PathVariable long id) {
+        log.info("Получен HTTP-запрос на получение рекомендация фильмов для пользователя с id: {}", id);
+        List<Film> recommendedFilms = userService.getRecommendedFilms(id);
+        log.info("Успешно обработан HTTP-запрос на получение рекомендация для пользователя с id: {}", id);
+        return recommendedFilms;
     }
 }

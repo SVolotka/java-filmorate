@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.dal.mappers;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.model.Film;
@@ -10,6 +11,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 
 @Component
+@RequiredArgsConstructor
 public class FilmRowMapper implements RowMapper<Film> {
 
     @Override
@@ -33,6 +35,17 @@ public class FilmRowMapper implements RowMapper<Film> {
             mpa = new Mpa(mpaId, mpaName);
         }
         film.setMpa(mpa);
+
+        try {
+            Long likesCount = rs.getLong("likes_count");
+            film.setRate(likesCount);
+        } catch (SQLException e) {
+            film.setRate(0L);
+        }
+
         return film;
     }
 }
+
+
+

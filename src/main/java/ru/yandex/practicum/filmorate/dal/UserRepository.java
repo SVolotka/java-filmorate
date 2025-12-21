@@ -14,7 +14,7 @@ import ru.yandex.practicum.filmorate.model.User;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Timestamp;
-import java.util.List;
+import java.util.*;
 
 @Repository
 @RequiredArgsConstructor
@@ -51,6 +51,7 @@ public class UserRepository {
 
     private static final String EXISTS_USER_QUERY = "SELECT 1 FROM users WHERE user_id = ?";
     private static final String IS_FRIEND_QUERY = "SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?";
+    private static final String DELETE_USER_BY_ID_QUERY = "DELETE FROM users WHERE user_id = ?";
 
     private final JdbcTemplate jdbcTemplate;
     private final UserRowMapper userRowMapper;
@@ -159,6 +160,13 @@ public class UserRepository {
             throw new NotFoundException("User with id=" + userId2 + " not found");
         }
         return jdbcTemplate.query(GET_COMMON_FRIENDS_QUERY, userRowMapper, userId1, userId2);
+    }
+
+    public void deleteUserById(long userId) {
+        int affectedRows = jdbcTemplate.update(DELETE_USER_BY_ID_QUERY, userId);
+        if (affectedRows == 0) {
+            throw new NotFoundException(String.format("Пользователь с id: %s не найден", userId));
+        }
     }
 
     private boolean isFriend(long userId, long friendId) {

@@ -2,10 +2,17 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.yandex.practicum.filmorate.dal.UserFeedRepository;
+import ru.yandex.practicum.filmorate.dal.FilmRepository;
 import ru.yandex.practicum.filmorate.dal.UserRepository;
 import ru.yandex.practicum.filmorate.exception.UserNotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.EventType;
+import ru.yandex.practicum.filmorate.model.Operation;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.model.UserFeed;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -15,6 +22,8 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final FilmRepository filmRepository;
+    private final UserFeedRepository userFeedRepository;
 
     public User create(User user) {
         validateUser(user);
@@ -42,6 +51,7 @@ public class UserService {
         return userRepository.update(user);
     }
 
+    @Transactional
     public void addFriend(long userId, long friendId) {
         if (!userRepository.exists(userId)) {
             throw new UserNotFoundException("User with id=" + userId + " not found");
@@ -50,8 +60,10 @@ public class UserService {
             throw new UserNotFoundException("User with id=" + friendId + " not found");
         }
         userRepository.addFriend(userId, friendId);
+        logFriendEvent(userId, friendId, Operation.ADD);
     }
 
+   @Transactional
     public void removeFriend(long userId, long friendId) {
         if (!userRepository.exists(userId)) {
             throw new UserNotFoundException("User with id=" + userId + " not found");
@@ -60,6 +72,7 @@ public class UserService {
             throw new UserNotFoundException("User with id=" + friendId + " not found");
         }
         userRepository.removeFriend(userId, friendId);
+        logFriendEvent(userId, friendId, Operation.REMOVE);
     }
 
     public List<User> getFriendsById(long id) {
@@ -77,6 +90,24 @@ public class UserService {
             throw new UserNotFoundException("User with id=" + friendId + " not found");
         }
         return userRepository.getCommonFriends(userId, friendId);
+    }
+
+    public List<UserFeed> getUserFeed(long userId) {
+        if (!userRepository.exists(userId)) {
+            throw new UserNotFoundException("User with id=" + userId + " not found");
+        }
+        return userFeedRepository.getByUserId(userId);
+    }
+
+    public void deleteUserById(long userId) {
+        userRepository.deleteUserById(userId);
+    }
+
+    public List<Film> getRecommendedFilms(long userId) {
+        if (!userRepository.exists(userId)) {
+            throw new UserNotFoundException("User with id=" + userId + " not found");
+        }
+        return filmRepository.getRecommendedFilms(userId);
     }
 
     private void checkAndSetName(User user) {
@@ -101,5 +132,15 @@ public class UserService {
         if (user.getBirthday() != null && user.getBirthday().isAfter(LocalDate.now())) {
             throw new ValidationException("Birthday cannot be in the future");
         }
+    }
+
+    private void logFriendEvent(long userId, long friendId, Operation operation) {
+        UserFeed userFeed = new UserFeed();
+        userFeed.setUserId(userId);
+        userFeed.setEntityId(friendId);
+        userFeed.setEventType(EventType.FRIEND);
+        userFeed.setOperation(operation);
+        userFeed.setTimestamp(System.currentTimeMillis());
+        userFeedRepository.create(userFeed);
     }
 }
